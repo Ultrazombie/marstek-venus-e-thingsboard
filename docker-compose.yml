@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d thingsboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  thingsboard-init:
+    image: thingsboard/tb-node:4.4.0.2
+    profiles: ["init"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: &tb-env
+        TB_QUEUE_TYPE: in-memory
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_PASSWORD: postgres
+      INSTALL_TB: "true"
+      LOAD_DEMO: "true"
+    volumes:
+      - tb-data:/data
+      - tb-logs:/var/log/thingsboard
+
+  thingsboard:
+    image: thingsboard/tb-node:4.4.0.2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+      - "1884:1883"
+    environment: *tb-env
+    volumes:
+      - tb-data:/data
+      - tb-logs:/var/log/thingsboard
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
+  marstek-bridge:
+    build: ./bridge
+    restart: unless-stopped
+    depends_on:
+      thingsboard:
+        condition: service_healthy
+    environment:
+      MARSTEK_HOST: ${MARSTEK_HOST:?set MARSTEK_HOST in .env}
+      MARSTEK_PORT: ${MARSTEK_PORT:-30000}
+      POLL_INTERVAL: ${POLL_INTERVAL:-60}
+      TZ: ${TZ:-Europe/Kyiv}
+      TB_URL: http://thingsboard:8080
+      TB_USER: ${TB_USER:-tenant@thingsboard.org}
+      TB_PASSWORD: ${TB_PASSWORD:-tenant}
+      TB_DEVICE_NAME: ${TB_DEVICE_NAME:-Marstek Venus E}
+    volumes:
+      - bridge-data:/data
+
+volumes:
+  bridge-data:
+  pg-data:
+  tb-data:
+  tb-logs:

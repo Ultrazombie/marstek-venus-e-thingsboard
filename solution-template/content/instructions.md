@@ -1,0 +1,57 @@
+## Marstek Venus E setup
+
+The demo device **Marstek Venus E** is already filled with simulated data, so you can explore the [main dashboard](${MAIN_DASHBOARD_URL}) right away. The steps below connect your real battery.
+
+### Step 1: Enable the Open API on the battery
+
+Open the Marstek app, select your Venus E and turn on **Open API**. Note the battery IP address and the UDP port (default 30000).
+
+### Step 2: Copy the device access token
+
+Open the **Marstek Venus E** device in ThingsBoard, press **Copy access token** and keep it for the next step.
+
+### Step 3: Run the bridge
+
+The bridge polls the battery over UDP and forwards telemetry to ThingsBoard. It must run on a machine in the same network as the battery. Save the file below as `docker-compose.yml`, fill in the three values and start it.
+
+```bash
+cat > docker-compose.yml <<'YAML'
+services:
+  marstek-bridge:
+    image: REPLACE_WITH_PUBLISHED_BRIDGE_IMAGE
+    restart: unless-stopped
+    environment:
+      MARSTEK_HOST: 192.168.1.50
+      TB_URL: https://YOUR_THINGSBOARD_HOST
+      TB_ACCESS_TOKEN: YOUR_DEVICE_ACCESS_TOKEN
+      TZ: Europe/Kyiv
+    volumes:
+      - bridge-data:/data
+volumes:
+  bridge-data:
+YAML
+docker compose up -d
+```{:copy-code}
+
+### Step 4: Open the dashboard
+
+Open the [main dashboard](${MAIN_DASHBOARD_URL}). Cards refresh every minute. Click a card to see its trend.
+
+### Using the controls
+
+- The status line shows the active mode and what the battery is doing right now. Click a tile to see what the mode does and how to configure it.
+- **Auto**, **AI** and **UPS** are switched on with one button. **Passive** charges or discharges at a chosen power for a chosen number of minutes. **Manual** is a weekly schedule of up to 10 windows: add them with **Add window**, edit them in place and press **Apply** to write the whole schedule to the battery in one go. Tick "Clear all other slots" to make the battery schedule match the list exactly.
+- The battery cannot report its own windows, so ThingsBoard remembers what was last applied (device attribute `manual_windows`) and restores it if the bridge is redeployed. Windows created in the Marstek app are not shown until you apply from here.
+- Every command asks for confirmation. Switching modes replaces the current mode and its schedule. A Manual schedule cannot be read back from the battery, so it cannot be restored from ThingsBoard.
+- **Battery settings** open from the gear on the Mode card (firmware 150 or newer) and set the depth of discharge (30-88%), the LED and Bluetooth advertising. The battery cannot report these values back, so the dashboard shows the last value set from it.
+- **Allow discharge to grid** is off by default. While it is off, Auto and AI are locked and discharge is unavailable in Passive and Manual. The setting is enforced by the bridge and is remembered across restarts.
+
+### Notes
+
+- The battery drops UDP packets when polled too often, so the bridge polls once a minute.
+- Marstek warns that enabling the Local API may disable some built-in features of the device to avoid command conflicts. Give the battery a static IP address and consider a UDP port between 49152 and 65535 instead of the default 30000.
+- To start with discharging allowed, add `ALLOW_DISCHARGE: "true"` to the bridge environment. The dashboard switch overrides it afterwards.
+- Daily and monthly grid input are computed by the bridge from the battery counter and kept in the `bridge-data` volume.
+- The demo data is simulated. Once the bridge sends real telemetry, the same dashboard shows your battery.
+
+For more about dashboards see the [ThingsBoard documentation](${DOCS_BASE_URL}/docs/user-guide/dashboards/).
