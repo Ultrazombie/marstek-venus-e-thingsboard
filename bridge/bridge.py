@@ -24,7 +24,9 @@ DEVICE_NAME = os.environ.get("TB_DEVICE_NAME", "Marstek Venus E")
 ALLOW_DISCHARGE = os.environ.get("ALLOW_DISCHARGE", "false").lower() == "true"
 STATE_FILE = os.environ.get("STATE_FILE", "/data/state.json")
 TZ = ZoneInfo(os.environ.get("TZ", "UTC"))
-ENERGY_KEY = "es_total_grid_input_energy"
+# counter key -> telemetry prefix, section of the state file (None keeps the original top-level keys)
+ENERGY_COUNTERS = {"es_total_grid_input_energy": ("grid_input", None),
+                   "es_total_grid_output_energy": ("grid_output", "grid_output")}
 
 FAST_METHODS = ["ES.GetStatus", "ES.GetMode", "Bat.GetStatus"]
 SLOW_METHODS = ["Wifi.GetStatus"]
@@ -180,11 +182,12 @@ def allow_discharge():
     return load_state().get("settings", {}).get("allow_discharge", ALLOW_DISCHARGE)
 
 
-def period_energy(current):
+def period_energy(current, prefix="grid_input", section=None):
     now = datetime.now(TZ)
     result = {}
 
-    def apply(state):
+    def apply(root):
+        state = root.setdefault(section, {}) if section else root
         last = state.get("last", current)
         for name, label in (("day", now.strftime("%Y-%m-%d")), ("month", now.strftime("%Y-%m"))):
             if state.get(name) != label:
@@ -193,8 +196,8 @@ def period_energy(current):
             if current < state[name + "_base"]:
                 state[name + "_base"] = current
         state["last"] = current
-        result["grid_input_day"] = current - state["day_base"]
-        result["grid_input_month"] = current - state["month_base"]
+        result[prefix + "_day"] = current - state["day_base"]
+        result[prefix + "_month"] = current - state["month_base"]
 
     update_state(apply)
     return result
@@ -365,11 +368,12 @@ def rpc_loop(sock, token):
 
 
 def add_period_energy(telemetry):
-    if ENERGY_KEY in telemetry:
-        try:
-            telemetry.update(period_energy(float(telemetry[ENERGY_KEY])))
-        except Exception as e:
-            print("period energy error:", e)
+    for key, (prefix, section) in ENERGY_COUNTERS.items():
+        if key in telemetry:
+            try:
+                telemetry.update(period_energy(float(telemetry[key]), prefix, section))
+            except Exception as e:
+                print("period energy error:", e)
 
 
 def main():
