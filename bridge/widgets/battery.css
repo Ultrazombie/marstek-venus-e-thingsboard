@@ -16,9 +16,8 @@
 .mb-hint { margin-left: 10px; font-size: 13px; font-weight: 500; color: var(--accent); }
 .mb-runtime { margin-left: 14px; font-size: 15px; font-weight: 500; color: rgba(0, 0, 0, .7); }
 .mb-spark { position: absolute; right: 18px; top: 34px; height: 44px; width: 30%; pointer-events: none; overflow: visible; }
-.mb-track { position: relative; height: 10px; border-radius: 5px; background: rgba(0, 0, 0, .08); }
-.mb-fill { height: 100%; width: 0; border-radius: 5px; background: var(--accent); transition: width .6s ease, background .6s ease; }
-.mb-marker { display: none; position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #f44336; }
+.mb-track { position: relative; height: 10px; border-radius: 5px; overflow: hidden; background: linear-gradient(90deg, #f44336, #ffc107 50%, #4caf50); }
+.mb-empty { position: absolute; top: 0; right: 0; bottom: 0; width: 100%; background: #e6e6e6; transition: width .6s ease; }
 .mb-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: rgba(0, 0, 0, .7); white-space: nowrap; }
 .mb-usable { font-weight: 600; color: rgba(0, 0, 0, .87); }
 .mb-reserve { color: #d32f2f; font-weight: 500; }
@@ -26,3 +25,4 @@
 .mb-card.stale .mb-updated { color: #f44336; }
 .mb-card.stale .mb-value, .mb-card.stale .mb-unit, .mb-card.stale .mb-foot, .mb-card.stale .mb-runtime, .mb-card.stale .mb-usable { color: rgba(0, 0, 0, .38); }
 .mb-card.stale .mb-spark { opacity: .35; }
+.mb-card.stale .mb-track { background: #90a4ae; }

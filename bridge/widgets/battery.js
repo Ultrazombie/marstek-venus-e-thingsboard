@@ -87,11 +87,8 @@ function render() {
     el.querySelector('.mb-card').style.setProperty('--accent', state.color);
     el.querySelector('.mb-value').textContent = Math.round(soc);
     el.querySelector('.mb-hint').textContent = state.hint;
-    el.querySelector('.mb-fill').style.width = Math.max(0, Math.min(100, soc)) + '%';
+    el.querySelector('.mb-empty').style.width = (100 - Math.max(0, Math.min(100, soc))) + '%';
 
-    var marker = el.querySelector('.mb-marker');
-    marker.style.display = reserve === null ? 'none' : 'block';
-    if (reserve !== null) { marker.style.left = reserve + '%'; }
     el.querySelector('.mb-reserve').textContent = reserve === null ? '' : 'Reserve ' + reserve + '%';
 
     var usable = '', energy = '';
@@ -119,7 +116,7 @@ self.onInit = function() {
         '<div class="mb-head"><span class="mb-label">Battery</span><span class="mb-updated"></span></div>' +
         '<div class="mb-main"><span class="mb-value">–</span><span class="mb-unit">%</span><span class="mb-hint"></span><span class="mb-runtime"></span></div>' +
         '<svg class="mb-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' +
-        '<div class="mb-track"><div class="mb-fill"></div><div class="mb-marker"></div></div>' +
+        '<div class="mb-track"><div class="mb-empty"></div></div>' +
         '<div class="mb-foot"><span><span class="mb-usable"></span><span class="mb-energy"></span></span>' +
         '<span class="mb-reserve"></span></div></div>';
     timer = setInterval(age, 15000);
