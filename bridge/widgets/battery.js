@@ -1,4 +1,4 @@
-var el, timer, lastTs, gradId;
+var el, timer, lastTs;
 var STALE_SEC = 180;
 var GREEN = '#4caf50', ORANGE = '#ff9800', RED = '#f44336';
 var RATE_WINDOW_MS = 3600000, RATE_MIN_SPAN_MS = 1800000, RATE_MIN_WH = 5;
@@ -56,27 +56,6 @@ function age() {
     el.querySelector('.mb-updated').textContent = stale ? 'no data for ' + Math.round(sec / 60) + ' min' : '';
 }
 
-function spark(top) {
-    var svg = el.querySelector('.mb-spark');
-    var points = series('bat_bat_capacity').map(function(p) { return Number(p[1]); }).filter(function(v) { return !isNaN(v); });
-    if (points.length < 2 || !top) { svg.innerHTML = ''; return; }
-    var n = Math.min(points.length, 80), size = points.length / n, vals = [];
-    for (var i = 0; i < n; i++) {
-        var chunk = points.slice(Math.floor(i * size), Math.floor((i + 1) * size) || undefined);
-        vals.push(chunk.reduce(function(a, b) { return a + b; }, 0) / chunk.length);
-    }
-    var xy = vals.map(function(v, i) {
-        return (i / (vals.length - 1) * 100).toFixed(2) + ',' + (28 - Math.min(1, v / top) * 26).toFixed(2);
-    });
-    svg.innerHTML =
-        '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/>' +
-        '<stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
-        '<polygon points="0,30 ' + xy.join(' ') + ' 100,30" fill="url(#' + gradId + ')"/>' +
-        '<polyline points="' + xy.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="1.6" ' +
-        'vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>';
-}
-
 function render() {
     if (!el) { return; }
     var soc = lastValue('es_bat_soc');
@@ -101,7 +80,6 @@ function render() {
     el.querySelector('.mb-runtime').textContent = runtimeText(stored, rated, reserve);
     el.querySelector('.mb-usable').textContent = usable;
     el.querySelector('.mb-energy').textContent = (usable && energy ? ' · ' : '') + energy;
-    spark(rated || stored);
 
     var d = series('es_bat_soc');
     lastTs = d[d.length - 1][0];
@@ -109,16 +87,16 @@ function render() {
 }
 
 self.onInit = function() {
-    gradId = 'mbg' + Math.random().toString(36).slice(2);
     el = self.ctx.$container[0].querySelector('.mb-root');
+    var image = (self.ctx.settings || {}).image;
     el.innerHTML =
         '<div class="mb-card" style="--accent:' + GREEN + '">' +
+        (image ? '<img class="mb-img" alt="Battery" src="' + image + '">' : '') + '<div class="mb-body">' +
         '<div class="mb-head"><span class="mb-label">Battery</span><span class="mb-updated"></span></div>' +
         '<div class="mb-main"><span class="mb-value">–</span><span class="mb-unit">%</span><span class="mb-hint"></span><span class="mb-runtime"></span></div>' +
-        '<svg class="mb-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' +
         '<div class="mb-track"><div class="mb-empty"></div></div>' +
         '<div class="mb-foot"><span><span class="mb-usable"></span><span class="mb-energy"></span></span>' +
-        '<span class="mb-reserve"></span></div></div>';
+        '<span class="mb-reserve"></span></div></div></div>';
     timer = setInterval(age, 15000);
 
     var descriptors = self.ctx.actionsApi.getActionDescriptors('cardClick');

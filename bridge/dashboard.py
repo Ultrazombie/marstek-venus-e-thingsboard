@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import urllib.parse
@@ -70,6 +71,8 @@ CHART_SPECS = {
 Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
+CARD_IMAGES = {"es_mode": "icon_mode", "es_ongrid_power": "icon_grid", "bat_bat_temp": "icon_temperature",
+               "es_offgrid_power": "icon_offgrid"}
 CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "flow": "Marstek energy flow",
           "grid_status": "Marstek mains timeline", "controls": "Marstek controls",
           "settings": "Marstek battery settings"}
@@ -77,6 +80,11 @@ CUSTOM_TYPE = {"status_card": "timeseries", "battery": "timeseries", "flow": "ti
                "controls": "rpc", "settings": "rpc"}
 CUSTOM_SIZE = {"status_card": (6, 1), "battery": (12, 2), "flow": (8, 3), "grid_status": (24, 1),
                "controls": (24, 8), "settings": (24, 5)}
+
+
+def image_uri(name):
+    with open(os.path.join(WIDGETS_DIR, "img", name + ".png"), "rb") as f:
+        return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
 def read(name, ext):
@@ -261,6 +269,7 @@ def build(configs, custom, alias_id, grid_alias=None):
         "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
         "openInSeparateDialog": True, "dialogTitle": CHART_SPECS["es_bat_soc"][0],
         "dialogHideDashboardToolbar": True}]}
+    cfg["settings"] = {"image": image_uri("battery")}
     add(custom["battery"], "timeseries", cfg, 12, 2, 0, 0)
 
     top = 2
@@ -277,6 +286,8 @@ def build(configs, custom, alias_id, grid_alias=None):
         cfg["datasources"] = datasource(alias_id, [(key, label, color)])
         cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
                            "color": color, "divisor": div, "kind": kind, "spark": spark}
+        if key in CARD_IMAGES:
+            cfg["settings"]["image"] = image_uri(CARD_IMAGES[key])
         if kind == "mode":
             cfg["settings"].update(gear=True, showAge=True, hint="Controls ›")
             cfg["actions"] = {"gearClick": [{
