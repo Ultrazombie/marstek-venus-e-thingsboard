@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "41"
+VERSION = "42"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -28,8 +28,8 @@ GRID = {"backgroundColor": "#eeeeee", "columns": COLS, "margin": 10, "outerMargi
 BLUE, GREEN, ORANGE, RED, GREY = "#2196f3", "#4caf50", "#ff9800", "#f44336", "#607d8b"
 
 MAX_POWER = 2500
-CHART_ROWS = 7
-ENERGY_ROW = 2 + CHART_ROWS
+CHART_ROWS = 4
+ENERGY_ROW = 2 + 2 * CHART_ROWS
 
 # label, key, units, decimals, icon, color, divisor, kind, sparkline range, (row, col, width)
 CARDS = [
@@ -174,20 +174,17 @@ def chart_config(base, alias_id, key, popup=False):
 
 
 def power_chart_config(base, alias_id):
-    """Grid and off-grid power on the left axis, battery charge and its reserve on the right."""
     cfg = chart_config(base, alias_id, "es_ongrid_power")
     cfg["datasources"][0]["dataKeys"] = [
         series_key("es_ongrid_power", fill=False, legend=True),
-        series_key("es_offgrid_power", fill=False, legend=True),
-        series_key("es_bat_soc", y_axis="soc", legend=True)]
-    cfg.update(title="Power and charge", titleIcon="show_chart", iconColor=BLUE, showLegend=True)
+        series_key("es_offgrid_power", fill=False, legend=True)]
+    cfg.update(title="Power (+ discharge / − charge)", titleIcon="bolt", iconColor=ORANGE, showLegend=True)
     cfg["settings"]["showLegend"] = True
-    axes = cfg["settings"]["yAxes"]
-    axes["soc"] = clone(axes["default"])
-    axes["soc"].update(id="soc", order=1, position="right", units="%", decimals=0, label="Charge",
-                       min=axis_limit(0), max=axis_limit(100), interval=25, showSplitLines=False)
-    axes["default"].update(label="+ discharge  /  − charge", interval=MAX_POWER / 2)
-    add_reserve_line(cfg, "%", 0, y_axis="soc")
+    cfg["settings"]["legendConfig"].update(position="top", direction="row", showMin=False, showMax=False,
+                                           showAvg=False, showTotal=False, showLatest=False)
+    cfg["settings"]["yAxes"]["default"]["interval"] = MAX_POWER / 2
+    for threshold in cfg["settings"]["thresholds"]:
+        threshold["showLabel"] = False
     return cfg
 
 
@@ -255,7 +252,9 @@ def build(configs, custom, alias_id):
                 "dialogHideDashboardToolbar": True}]}
         add(custom["status_card"], "timeseries", cfg, w, CARD_ROWS, row, col)
 
-    add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id), COLS, CHART_ROWS, 2, 0)
+    add("system.time_series_chart", "timeseries", chart_config(base, alias_id, "es_bat_soc"), COLS, CHART_ROWS, 2, 0)
+    add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id),
+        COLS, CHART_ROWS, 2 + CHART_ROWS, 0)
 
     cfg = custom_cfg()
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}
@@ -278,7 +277,7 @@ def dashboard_config(configs, custom, device_name):
         "widgets": widgets,
         "states": {name: {"name": STATE_NAMES.get(name, name), "root": name == "default",
                           "layouts": {"main": {"widgets": layout,
-                                    "gridSettings": GRID}}}
+                                    "gridSettings": dict(GRID, autoFillHeight=name == "default")}}}
                    for name, layout in layouts.items()},
         "entityAliases": {alias_id: {"id": alias_id, "alias": device_name, "filter": {
             "type": "entityName", "resolveMultiple": False,
