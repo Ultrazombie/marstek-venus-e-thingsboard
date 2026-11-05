@@ -1,6 +1,7 @@
 var el, timer, lastTs, gradId;
 var STALE_SEC = 180;
 var GREEN = '#4caf50', ORANGE = '#ff9800', RED = '#f44336';
+var RATE_WINDOW_MS = 3600000, RATE_MIN_SPAN_MS = 1800000, RATE_MIN_WH = 5;
 
 function series(name) {
     var row = (self.ctx.data || []).filter(function(d) { return d.dataKey && d.dataKey.name === name; })[0];
@@ -24,6 +25,27 @@ function level(soc, reserve) {
     if (soc <= floor) { return { color: RED, hint: reserve === null ? 'Very low' : 'At reserve' }; }
     if (soc <= floor + 10) { return { color: ORANGE, hint: 'Low' }; }
     return { color: GREEN, hint: soc >= 99 ? 'Full' : '' };
+}
+
+// Wh per hour over the last hour of stored energy; positive means the battery is draining.
+function drainRate() {
+    var d = series('bat_bat_capacity');
+    if (d.length < 2) { return null; }
+    var end = d[d.length - 1], start = null;
+    for (var i = d.length - 1; i >= 0 && end[0] - d[i][0] <= RATE_WINDOW_MS; i--) { start = d[i]; }
+    if (!start || end[0] - start[0] < RATE_MIN_SPAN_MS) { return null; }
+    return (Number(start[1]) - Number(end[1])) / ((end[0] - start[0]) / 3600000);
+}
+
+function runtimeText(stored, rated, reserve) {
+    var rate = drainRate();
+    if (rate === null || stored === null || reserve === null || !rated) { return ''; }
+    if (rate <= -RATE_MIN_WH) { return 'Charging'; }
+    if (rate < RATE_MIN_WH) { return ''; }
+    var hours = Math.max(0, stored - reserve / 100 * rated) / rate;
+    if (hours <= 0) { return ''; }
+    var span = hours < 1 ? Math.round(hours * 60) + ' min' : hours < 72 ? Math.round(hours) + ' h' : Math.round(hours / 24) + ' days';
+    return '≈ ' + span + ' to reserve';
 }
 
 function age() {
@@ -79,6 +101,7 @@ function render() {
             usable = (Math.max(0, stored - reserve / 100 * rated) / 1000).toFixed(2) + ' kWh usable';
         }
     }
+    el.querySelector('.mb-runtime').textContent = runtimeText(stored, rated, reserve);
     el.querySelector('.mb-usable').textContent = usable;
     el.querySelector('.mb-energy').textContent = (usable && energy ? ' · ' : '') + energy;
     spark(rated || stored);
@@ -94,7 +117,7 @@ self.onInit = function() {
     el.innerHTML =
         '<div class="mb-card" style="--accent:' + GREEN + '">' +
         '<div class="mb-head"><span class="mb-label">Battery</span><span class="mb-updated"></span></div>' +
-        '<div class="mb-main"><span class="mb-value">–</span><span class="mb-unit">%</span><span class="mb-hint"></span></div>' +
+        '<div class="mb-main"><span class="mb-value">–</span><span class="mb-unit">%</span><span class="mb-hint"></span><span class="mb-runtime"></span></div>' +
         '<svg class="mb-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' +
         '<div class="mb-track"><div class="mb-fill"></div><div class="mb-marker"></div></div>' +
         '<div class="mb-foot"><span><span class="mb-usable"></span><span class="mb-energy"></span></span>' +

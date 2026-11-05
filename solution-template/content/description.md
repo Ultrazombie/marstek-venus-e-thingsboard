@@ -14,7 +14,7 @@ Monitor and control a Marstek Venus E home battery from ThingsBoard. A small bri
 
 ### What is included
 
-- A dashboard with custom widgets: a battery card with usable energy and reserve, status cards and a control panel.
+- A dashboard with custom widgets: a battery card with usable energy, reserve and estimated time to reserve, an energy flow diagram, status cards and a control panel.
 - A device profile with a high battery temperature alarm.
 - A demo device with simulated data, so the dashboard is populated right after installation.
 

@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "42"
+VERSION = "43"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -14,6 +14,9 @@ def realtime_window(ms):
 
 TW_MAIN = realtime_window(6 * 3600 * 1000)
 TW_DAY = realtime_window(24 * 3600 * 1000)
+TW_DAILY_BARS = {"displayValue": "", "selectedTab": 0,
+                 "realtime": {"realtimeType": 0, "interval": 24 * 3600 * 1000, "timewindowMs": 14 * 24 * 3600 * 1000},
+                 "aggregation": {"type": "MAX", "limit": 1000}}
 TW_MONTH = {"selectedTab": 1,
             "history": {"historyType": 0, "interval": 7200000, "timewindowMs": 30 * 24 * 3600 * 1000},
             "aggregation": {"type": "MAX", "limit": 1000}}
@@ -29,7 +32,10 @@ BLUE, GREEN, ORANGE, RED, GREY = "#2196f3", "#4caf50", "#ff9800", "#f44336", "#6
 
 MAX_POWER = 2500
 CHART_ROWS = 4
-ENERGY_ROW = 2 + 2 * CHART_ROWS
+LEFT_COLS = 16
+# Optional device whose telemetry key is above 0 while mains power is present; adds a timeline strip.
+GRID_DEVICE = os.environ.get("TB_GRID_DEVICE")
+GRID_KEY = os.environ.get("TB_GRID_KEY", "power")
 
 # label, key, units, decimals, icon, color, divisor, kind, sparkline range, (row, col, width)
 CARDS = [
@@ -37,8 +43,12 @@ CARDS = [
     ("Grid power", "es_ongrid_power", "W", 0, "bolt", GREEN, None, "grid", None, (0, 18, 6)),
     ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp", (0, 60), (1, 12, 6)),
     ("Off-grid power", "es_offgrid_power", "W", 0, "power", BLUE, None, None, None, (1, 18, 6)),
-    ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None, None, (ENERGY_ROW, 0, 12)),
-    ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None, None, (ENERGY_ROW, 12, 12)),
+]
+
+# Same fields; rows are relative to the first row below the status cards.
+ENERGY_CARDS = [
+    ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None, None, (7, LEFT_COLS, 4)),
+    ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None, None, (7, LEFT_COLS + 4, 4)),
 ]
 
 TEMP = "#ff7043"
@@ -58,10 +68,13 @@ Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60),
            "es_ongrid_power": (-MAX_POWER, MAX_POWER), "es_offgrid_power": (0, MAX_POWER)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
-CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "controls": "Marstek controls",
+CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "flow": "Marstek energy flow",
+          "grid_status": "Marstek mains timeline", "controls": "Marstek controls",
           "settings": "Marstek battery settings"}
-CUSTOM_TYPE = {"status_card": "timeseries", "battery": "timeseries", "controls": "rpc", "settings": "rpc"}
-CUSTOM_SIZE = {"status_card": (6, 1), "battery": (12, 2), "controls": (24, 8), "settings": (24, 5)}
+CUSTOM_TYPE = {"status_card": "timeseries", "battery": "timeseries", "flow": "timeseries", "grid_status": "timeseries",
+               "controls": "rpc", "settings": "rpc"}
+CUSTOM_SIZE = {"status_card": (6, 1), "battery": (12, 2), "flow": (8, 3), "grid_status": (24, 1),
+               "controls": (24, 8), "settings": (24, 5)}
 
 
 def read(name, ext):
@@ -188,7 +201,25 @@ def power_chart_config(base, alias_id):
     return cfg
 
 
-def build(configs, custom, alias_id):
+def energy_chart_config(base, alias_id):
+    """Daily energy from the battery's lifetime counters: each bar is the rise since the previous day."""
+    cfg = chart_config(base, alias_id, "grid_input_month")
+    post = "return prevOrigValue ? Math.max(0, value - prevOrigValue) / 1000 : 0;"
+    cfg["datasources"][0]["dataKeys"] = [
+        {"name": key, "type": "timeseries", "label": label, "color": color, "units": "kWh", "decimals": 2,
+         "usePostProcessing": True, "postFuncBody": post,
+         "settings": {"yAxisId": "default", "showInLegend": True, "dataHiddenByDefault": False, "type": "bar"}}
+        for key, label, color in (("es_total_grid_input_energy", "Charged from grid", GREEN),
+                                  ("es_total_grid_output_energy", "Sent to grid", ORANGE))]
+    cfg.update(title="Energy per day", titleIcon="bar_chart", iconColor=GREEN, showLegend=True,
+               useDashboardTimewindow=False, timewindow=TW_DAILY_BARS)
+    cfg["settings"]["showLegend"] = True
+    cfg["settings"]["legendConfig"].update(position="top", direction="row", showMin=False, showMax=False,
+                                           showAvg=False, showTotal=False, showLatest=False)
+    return cfg
+
+
+def build(configs, custom, alias_id, grid_alias=None):
     widgets, layouts = {}, {"default": {}, "settings": {}, "controls": {}}
     for key in CHART_SPECS:
         layouts["chart_" + key] = {}
@@ -225,7 +256,16 @@ def build(configs, custom, alias_id):
         "dialogHideDashboardToolbar": True}]}
     add(custom["battery"], "timeseries", cfg, 12, 2, 0, 0)
 
-    for label, key, units, decimals, icon, color, div, kind, spark, (row, col, w) in CARDS:
+    top = 2
+    if grid_alias:
+        cfg = custom_cfg()
+        cfg["datasources"] = datasource(grid_alias, [(GRID_KEY, "Mains power", GREEN)])
+        add(custom["grid_status"], "timeseries", cfg, COLS, 1, top, 0)
+        top += 1
+
+    placed = [(card, 0) for card in CARDS] + [(card, top) for card in ENERGY_CARDS]
+    for (label, key, units, decimals, icon, color, div, kind, spark, (row, col, w)), offset in placed:
+        row += offset
         cfg = custom_cfg()
         cfg["datasources"] = datasource(alias_id, [(key, label, color)])
         cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
@@ -252,9 +292,16 @@ def build(configs, custom, alias_id):
                 "dialogHideDashboardToolbar": True}]}
         add(custom["status_card"], "timeseries", cfg, w, CARD_ROWS, row, col)
 
-    add("system.time_series_chart", "timeseries", chart_config(base, alias_id, "es_bat_soc"), COLS, CHART_ROWS, 2, 0)
+    add("system.time_series_chart", "timeseries", chart_config(base, alias_id, "es_bat_soc"),
+        LEFT_COLS, CHART_ROWS, top, 0)
     add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id),
-        COLS, CHART_ROWS, 2 + CHART_ROWS, 0)
+        LEFT_COLS, CHART_ROWS, top + CHART_ROWS, 0)
+
+    cfg = custom_cfg()
+    cfg["datasources"] = datasource(alias_id, [(n, n, BLUE) for n in ("es_ongrid_power", "es_offgrid_power", "es_bat_soc")])
+    add(custom["flow"], "timeseries", cfg, COLS - LEFT_COLS, 3, top, LEFT_COLS)
+    add("system.time_series_chart", "timeseries", energy_chart_config(base, alias_id),
+        COLS - LEFT_COLS, 4, top + 3, LEFT_COLS)
 
     cfg = custom_cfg()
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}
@@ -271,7 +318,13 @@ def build(configs, custom, alias_id):
 
 def dashboard_config(configs, custom, device_name):
     alias_id = str(uuid.uuid4())
-    widgets, layouts = build(configs, custom, alias_id)
+    grid_alias = str(uuid.uuid4()) if GRID_DEVICE else None
+    widgets, layouts = build(configs, custom, alias_id, grid_alias)
+    aliases = {alias_id: {"id": alias_id, "alias": device_name, "filter": {
+        "type": "entityName", "resolveMultiple": False, "entityType": "DEVICE", "entityNameFilter": device_name}}}
+    if grid_alias:
+        aliases[grid_alias] = {"id": grid_alias, "alias": GRID_DEVICE, "filter": {
+            "type": "entityName", "resolveMultiple": False, "entityType": "DEVICE", "entityNameFilter": GRID_DEVICE}}
     return {
         "description": "v" + VERSION,
         "widgets": widgets,
@@ -279,9 +332,7 @@ def dashboard_config(configs, custom, device_name):
                           "layouts": {"main": {"widgets": layout,
                                     "gridSettings": dict(GRID, autoFillHeight=name == "default")}}}
                    for name, layout in layouts.items()},
-        "entityAliases": {alias_id: {"id": alias_id, "alias": device_name, "filter": {
-            "type": "entityName", "resolveMultiple": False,
-            "entityType": "DEVICE", "entityNameFilter": device_name}}},
+        "entityAliases": aliases,
         "timewindow": TW_MAIN,
         "settings": {"stateControllerId": "entity", "showTitle": False, "showDashboardsSelect": False,
                      "showEntitiesSelect": False, "showFilters": False, "showDashboardTimewindow": True,
