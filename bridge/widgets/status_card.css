@@ -15,7 +15,12 @@
 .mv-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .mv-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .mv-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(0, 0, 0, .54); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mv-updated { font-size: 10px; color: #f44336; white-space: nowrap; }
+.mv-updated { font-size: 10px; color: rgba(0, 0, 0, .45); white-space: nowrap; }
+.mv-card.stale .mv-updated { color: #f44336; }
+.mv-card.stale { --accent: #90a4ae !important; }
+.mv-card.stale .mv-value, .mv-card.stale .mv-unit { color: rgba(0, 0, 0, .38); }
+.mv-card.stale .mv-spark { opacity: .35; }
+.mv-card.has-gear .mv-body { padding-right: 44px; }
 .mv-main { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; line-height: 1.1; }
 .mv-value { font-size: 20px; font-weight: 600; }
 .mv-unit { font-size: 12px; font-weight: 500; color: rgba(0, 0, 0, .54); }

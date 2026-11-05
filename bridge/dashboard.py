@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "39"
+VERSION = "40"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -37,13 +37,14 @@ CARDS = [
     ],
     [
         ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp"),
-        ("Capacity", "bat_bat_capacity", "Wh", 0, "battery_charging_full", BLUE, None, None),
+        ("Stored energy", "bat_bat_capacity", "Wh", 0, "battery_charging_full", BLUE, None, "stored"),
         ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None),
         ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None),
     ],
 ]
 
 TEMP = "#ff7043"
+STATE_NAMES = {"default": TITLE, "controls": "Battery control"}
 
 # key -> title, icon, units, decimals, colour, divisor, threshold lines (value, colour)
 CHART_SPECS = {
@@ -51,7 +52,7 @@ CHART_SPECS = {
     "es_ongrid_power": ("Grid power", "bolt", "W", 0, ORANGE, None, [(0, GREY)]),
     "es_offgrid_power": ("Off-grid power", "power", "W", 0, BLUE, None, []),
     "bat_bat_temp": ("Battery temperature", "thermostat", "°C", 1, TEMP, None, [(40, ORANGE), (50, RED)]),
-    "bat_bat_capacity": ("Battery capacity", "battery_charging_full", "Wh", 0, BLUE, None, []),
+    "bat_bat_capacity": ("Stored energy", "battery_charging_full", "Wh", 0, BLUE, None, []),
     "grid_input_day": ("Grid input today", "today", "kWh", 2, BLUE, 1000, []),
     "grid_input_month": ("Grid input month", "calendar_month", "kWh", 2, BLUE, 1000, []),
 }
@@ -169,7 +170,7 @@ def chart_config(base, alias_id, key, popup=False):
 
 
 def build(configs, custom, alias_id):
-    widgets, layouts = {}, {"default": {}, "settings": {}}
+    widgets, layouts = {}, {"default": {}, "settings": {}, "controls": {}}
     for key in CHART_SPECS:
         layouts["chart_" + key] = {}
 
@@ -197,17 +198,24 @@ def build(configs, custom, alias_id):
         w = COLS // len(cards)
         for i, (label, key, units, decimals, icon, color, div, kind) in enumerate(cards):
             cfg = custom_cfg()
-            cfg["datasources"] = datasource(alias_id, [(key, label, color)])
+            keys = [(key, label, color)]
+            if kind == "stored":
+                keys.append(("bat_rated_capacity", "Rated capacity", color))
+            cfg["datasources"] = datasource(alias_id, keys)
             cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
                                "color": color, "divisor": div, "kind": kind}
             if kind == "mode":
-                cfg["settings"]["gear"] = True
+                cfg["settings"].update(gear=True, showAge=True, hint="Controls ›")
                 cfg["actions"] = {"gearClick": [{
                     "id": str(uuid.uuid4()), "name": "Battery settings", "icon": "settings",
                     "type": "openDashboardState", "targetDashboardStateId": "settings",
                     "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
                     "openInSeparateDialog": True, "dialogTitle": "Battery settings",
-                    "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 38}]}
+                    "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 38}],
+                    "cardClick": [{
+                        "id": str(uuid.uuid4()), "name": "Open battery control", "icon": "tune",
+                        "type": "openDashboardState", "targetDashboardStateId": "controls",
+                        "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None}]}
             if key in CHART_SPECS:
                 title = CHART_SPECS[key][0]
                 cfg["actions"] = {"cardClick": [{
@@ -228,7 +236,7 @@ def build(configs, custom, alias_id):
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}
     cfg["targetDeviceAliasIds"] = [alias_id]
     cfg["settings"] = {"maxPower": 2500}
-    add(custom["controls"], "rpc", cfg, COLS, 8, row, 0)
+    add(custom["controls"], "rpc", cfg, COLS, 8, 0, 0, state="controls")
 
     cfg = custom_cfg()
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}
@@ -243,7 +251,7 @@ def dashboard_config(configs, custom, device_name):
     return {
         "description": "v" + VERSION,
         "widgets": widgets,
-        "states": {name: {"name": name if name != "default" else TITLE, "root": name == "default",
+        "states": {name: {"name": STATE_NAMES.get(name, name), "root": name == "default",
                           "layouts": {"main": {"widgets": layout,
                                     "gridSettings": GRID}}}
                    for name, layout in layouts.items()},

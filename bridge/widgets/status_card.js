@@ -1,4 +1,5 @@
 var timer, lastTs, el, gradId;
+var STALE_SEC = 180;
 
 function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
@@ -25,9 +26,17 @@ function state(kind, v) {
 
 function age() {
     if (!lastTs) { return; }
-    var sec = Math.round((Date.now() - lastTs) / 1000);
+    var sec = Math.max(0, Math.round((Date.now() - lastTs) / 1000));
+    var stale = sec > STALE_SEC;
     var node = el.querySelector('.mv-updated');
-    node.textContent = sec > 180 ? 'no data for ' + Math.round(sec / 60) + ' min' : '';
+    el.querySelector('.mv-card').classList.toggle('stale', stale);
+    if (stale) {
+        node.textContent = 'no data for ' + Math.round(sec / 60) + ' min';
+    } else if ((self.ctx.settings || {}).showAge) {
+        node.textContent = 'updated ' + (sec < 60 ? sec + ' s' : Math.round(sec / 60) + ' min') + ' ago';
+    } else {
+        node.textContent = '';
+    }
 }
 
 self.onInit = function() {
@@ -35,12 +44,12 @@ self.onInit = function() {
     gradId = 'mvg' + Math.random().toString(36).slice(2);
     el = self.ctx.$container[0].querySelector('.mv-root');
     el.innerHTML =
-        '<div class="mv-card" style="--accent:' + esc(s.color || '#2196f3') + '">' +
+        '<div class="mv-card' + (s.gear ? ' has-gear' : '') + '" style="--accent:' + esc(s.color || '#2196f3') + '">' +
         '<div class="mv-icon"><span class="material-icons">' + esc(s.icon || 'bolt') + '</span></div>' +
         '<div class="mv-body">' +
         '<div class="mv-head"><span class="mv-label">' + esc(s.label) + '</span><span class="mv-updated"></span></div>' +
         '<div class="mv-main"><span class="mv-value">–</span><span class="mv-unit">' + esc(s.units) + '</span>' +
-        '<span class="mv-hint"></span></div></div>' +
+        '<span class="mv-hint">' + esc(s.hint) + '</span></div></div>' +
         '<svg class="mv-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' +
         (s.kind === 'soc' ? '<div class="mv-bar"><div class="mv-fill"></div></div>' : '') +
         (s.gear ? '<button type="button" class="mv-gear" title="Settings"><span class="material-icons">settings</span></button>' : '') +
@@ -120,6 +129,11 @@ self.onDataUpdated = function() {
         }
     }
     el.querySelector('.mv-value').textContent = shown;
+    if (s.kind === 'stored') {
+        var rated = self.ctx.data[1] && self.ctx.data[1].data;
+        var total = rated && rated.length ? Number(rated[rated.length - 1][1]) : NaN;
+        el.querySelector('.mv-unit').textContent = (total > 0 ? '/ ' + total + ' ' : '') + (s.units || '');
+    }
     if (s.kind === 'soc' && isNum) {
         var fill = el.querySelector('.mv-fill');
         fill.style.width = Math.max(0, Math.min(100, num)) + '%';
@@ -141,7 +155,7 @@ self.onDestroy = function() {
 };
 
 self.typeParameters = function() {
-    return { maxDatasources: 1, maxDataKeys: 1, dataKeysOptional: false };
+    return { maxDatasources: 1, maxDataKeys: 2, dataKeysOptional: false };
 };
 
 self.actionSources = function() {

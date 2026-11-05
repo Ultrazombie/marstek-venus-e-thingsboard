@@ -35,11 +35,11 @@ docker compose up -d
 
 ### Step 4: Open the dashboard
 
-Open the [main dashboard](${MAIN_DASHBOARD_URL}). Cards refresh every minute. Click a card to see its trend.
+Open the [main dashboard](${MAIN_DASHBOARD_URL}). Cards refresh every minute and turn grey when no data has arrived for 3 minutes. Click a card to see its trend.
 
 ### Using the controls
 
-- The status line shows the active mode and what the battery is doing right now. Click a tile to see what the mode does and how to configure it.
+- Click the **Mode** card to open the **Battery control** page; monitoring stays on the main page. The status line shows the active mode and what the battery is doing right now. Click a tile to see what the mode does and how to configure it.
 - **Auto**, **AI** and **UPS** are switched on with one button. **Passive** charges or discharges at a chosen power for a chosen number of minutes. **Manual** is a weekly schedule of up to 10 windows: add them with **Add window**, edit them in place and press **Apply** to write the whole schedule to the battery in one go. Tick "Clear all other slots" to make the battery schedule match the list exactly.
 - The battery cannot report its own windows, so ThingsBoard remembers what was last applied (device attribute `manual_windows`) and restores it if the bridge is redeployed. Windows created in the Marstek app are not shown until you apply from here.
 - Every command asks for confirmation. Switching modes replaces the current mode and its schedule. A Manual schedule cannot be read back from the battery, so it cannot be restored from ThingsBoard.
