@@ -68,8 +68,10 @@ function age() {
 
 function setMood(card) {
     var grid = lastValue('es_ongrid_power') || 0, off = lastValue('es_offgrid_power') || 0;
-    var next = grid < -FLOW_MIN_W ? 'charging' : (grid > FLOW_MIN_W || off > FLOW_MIN_W) ? 'discharging' : 'idle';
-    ['charging', 'discharging', 'idle'].forEach(function(m) { card.classList.toggle(m, m === next); });
+    // The battery can lose energy with 0 W reported: its own electronics draw power during an outage.
+    var next = grid < -FLOW_MIN_W ? 'charging' : (grid > FLOW_MIN_W || off > FLOW_MIN_W) ? 'discharging' :
+        drainRate() >= RATE_MIN_WH ? 'draining' : 'idle';
+    ['charging', 'discharging', 'draining', 'idle'].forEach(function(m) { card.classList.toggle(m, m === next); });
     if (mood && mood !== next) {
         card.classList.remove('bloom');
         void card.offsetWidth;

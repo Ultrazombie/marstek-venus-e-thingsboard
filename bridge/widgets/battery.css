@@ -5,7 +5,7 @@
   display: flex; flex-direction: column;
   font-family: 'IBM Plex Sans', Roboto, sans-serif; color: #E8E6E1;
 }
-.mb-card.discharging { --mood: 232, 177, 112; }
+.mb-card.discharging, .mb-card.draining { --mood: 232, 177, 112; }
 .mb-card.clickable { cursor: pointer; }
 .mb-head, .mb-main, .mb-runtime, .mb-track, .mb-foot { position: relative; z-index: 3; }
 
@@ -22,6 +22,7 @@
 .mb-card.idle .mb-halo-green { opacity: .75; }
 .mb-card.charging .mb-halo-green { opacity: 1; animation: mb-breathe 4s ease-in-out infinite; }
 .mb-card.discharging .mb-halo-warm { opacity: 1; animation: mb-ember 6s ease-in-out infinite; }
+.mb-card.draining .mb-halo-warm { opacity: .65; }
 @keyframes mb-breathe { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
 @keyframes mb-ember { 0%, 100% { filter: brightness(1); } 35% { filter: brightness(.82); } 70% { filter: brightness(1.08); } }
 .mb-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 24%; background: radial-gradient(50% 42% at 54% 34%, rgba(0, 0, 0, .55), transparent); pointer-events: none; }
@@ -57,7 +58,7 @@
 .mb-card.charging .mb-sheen, .mb-card.discharging .mb-sheen { opacity: 1; }
 .mb-card.discharging .mb-sheen::after { animation-direction: reverse; }
 @keyframes mb-sheen { from { left: -90px; } to { left: 100%; } }
-.mb-card.discharging .mb-fill { --accent: #E8B170; }
+.mb-card.discharging .mb-fill, .mb-card.draining .mb-fill { --accent: #E8B170; }
 .mb-marker { display: none; position: absolute; top: -5px; bottom: -5px; width: 1px; background: #D9694F; }
 .mb-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14px; font-weight: 400; color: #8A8F94; white-space: nowrap; }
 .mb-foot-value { color: #E8E6E1; font-variant-numeric: tabular-nums; }
@@ -65,7 +66,7 @@
 .mb-device { position: absolute; left: 50%; bottom: 8px; z-index: 2; transform: translateX(-50%); height: min(calc(100cqh - 372px), calc(72cqw * 1060 / 800)); aspect-ratio: 800 / 1060; }
 .mb-img { position: relative; display: block; width: 100%; height: 100%; }
 .mb-led { position: absolute; width: 1.3%; height: .24%; margin: -.12% 0 0 -.65%; border-radius: 1px; background: rgb(var(--mood)); box-shadow: 0 0 5px 1px rgba(var(--mood), .8); opacity: .8; transition: background .8s, box-shadow .8s; }
-.mb-card.idle .mb-led { animation: mb-led-rest 5s ease-in-out var(--d) infinite; }
+.mb-card.idle .mb-led, .mb-card.draining .mb-led { animation: mb-led-rest 5s ease-in-out var(--d) infinite; }
 .mb-card.charging .mb-led, .mb-card.discharging .mb-led { animation: mb-led-run 1.5s ease-in-out var(--d) infinite; }
 .mb-card.discharging .mb-led { animation-direction: reverse; }
 @keyframes mb-led-rest { 50% { opacity: .35; } }
