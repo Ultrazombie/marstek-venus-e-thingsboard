@@ -42,8 +42,8 @@ self.onInit = function() {
     el = self.ctx.$container[0].querySelector('.mv-root');
     el.innerHTML =
         '<div class="mv-card' + (s.gear ? ' has-gear' : '') + '" style="--accent:' + esc(s.color || '#2196f3') + '">' +
-        (s.image ? '<img class="mv-img" alt="" src="' + s.image + '">' :
-            '<div class="mv-icon"><span class="material-icons">' + esc(s.icon || 'bolt') + '</span></div>') +
+        (s.image ? '<img class="mv-bg" alt="" src="' + s.image + '">' : '') +
+        '<div class="mv-icon"><span class="material-icons">' + esc(s.icon || 'bolt') + '</span></div>' +
         '<div class="mv-body">' +
         '<div class="mv-head"><span class="mv-label">' + esc(s.label) + '</span><span class="mv-updated"></span></div>' +
         '<div class="mv-main"><span class="mv-value">–</span><span class="mv-unit">' + esc(s.units) + '</span>' +

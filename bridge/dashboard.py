@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "51"
+VERSION = "52"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -41,7 +41,7 @@ GRID_KEY = os.environ.get("TB_GRID_KEY", "power")
 CARDS = [
     ("Mode", "es_mode", "", None, "tune", BLUE, None, "mode", None, (0, 12, 6)),
     ("Grid power", "es_ongrid_power", "W", 0, "bolt", GREEN, None, "grid", None, (0, 18, 6)),
-    ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp", (0, 60), (1, 12, 6)),
+    ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp", None, (1, 12, 6)),
     ("Off-grid power", "es_offgrid_power", "W", 0, "power", BLUE, None, None, None, (1, 18, 6)),
 ]
 
@@ -71,8 +71,7 @@ CHART_SPECS = {
 Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
-CARD_IMAGES = {"es_mode": "icon_mode", "es_ongrid_power": "icon_grid", "bat_bat_temp": "icon_temperature",
-               "es_offgrid_power": "icon_offgrid"}
+CARD_IMAGES = {"es_ongrid_power": "icon_grid", "bat_bat_temp": "icon_temperature", "es_offgrid_power": "icon_offgrid"}
 CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "flow": "Marstek energy flow",
           "grid_status": "Marstek mains timeline", "controls": "Marstek controls",
           "settings": "Marstek battery settings"}
