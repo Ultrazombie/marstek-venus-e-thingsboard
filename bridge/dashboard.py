@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "38"
+VERSION = "39"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -47,7 +47,7 @@ TEMP = "#ff7043"
 
 # key -> title, icon, units, decimals, colour, divisor, threshold lines (value, colour)
 CHART_SPECS = {
-    "es_bat_soc": ("Battery charge", "battery_full", "%", 0, GREEN, None, [(20, RED)]),
+    "es_bat_soc": ("Battery charge", "battery_full", "%", 0, GREEN, None, []),
     "es_ongrid_power": ("Grid power", "bolt", "W", 0, ORANGE, None, [(0, GREY)]),
     "es_offgrid_power": ("Off-grid power", "power", "W", 0, BLUE, None, []),
     "bat_bat_temp": ("Battery temperature", "thermostat", "°C", 1, TEMP, None, [(40, ORANGE), (50, RED)]),
@@ -120,6 +120,21 @@ def clone(x):
     return json.loads(json.dumps(x))
 
 
+def axis_limit(value):
+    return {"type": "constant", "value": value, "entityAlias": None}
+
+
+def add_reserve_line(cfg, units, decimals):
+    """Draw the backup reserve (100 - depth of discharge) from the last DOD known to ThingsBoard."""
+    cfg["datasources"][0]["latestDataKeys"] = [
+        {"name": "dod", "type": "attribute", "label": "Backup reserve", "color": RED, "settings": {},
+         "usePostProcessing": True, "postFuncBody": "return 100 - value;"}]
+    cfg["settings"]["thresholds"] = [
+        {"type": "latestKey", "latestKey": "dod", "latestKeyType": "attribute", "yAxisId": "default",
+         "units": units, "decimals": decimals, "lineColor": RED, "lineType": "dashed", "lineWidth": 1,
+         "startSymbol": "none", "endSymbol": "none", "showLabel": True, "labelPosition": "end", "labelColor": RED}]
+
+
 def chart_config(base, alias_id, key, popup=False):
     title, icon, units, decimals, color, div, thresholds = CHART_SPECS[key]
     data_key = {"name": key, "type": "timeseries", "label": title, "color": color,
@@ -142,11 +157,14 @@ def chart_config(base, alias_id, key, popup=False):
         cfg.update(useDashboardTimewindow=False, timewindow=POPUP_WINDOW.get(key, TW_DAY))
     cfg["settings"]["yAxes"]["default"].update(units=units, decimals=decimals)
     if key in Y_RANGE:
-        cfg["settings"]["yAxes"]["default"].update(min=Y_RANGE[key][0], max=Y_RANGE[key][1])
+        # a bare 0 is treated as "not set" by the chart, so pass limits as value sources
+        cfg["settings"]["yAxes"]["default"].update(min=axis_limit(Y_RANGE[key][0]), max=axis_limit(Y_RANGE[key][1]))
     cfg["settings"]["thresholds"] = [
         {"type": "constant", "value": v, "yAxisId": "default", "units": units, "decimals": decimals,
          "lineColor": c, "lineType": "dashed", "lineWidth": 1, "startSymbol": "none", "endSymbol": "none",
          "showLabel": True, "labelPosition": "end", "labelColor": c} for v, c in thresholds]
+    if key == "es_bat_soc":
+        add_reserve_line(cfg, units, decimals)
     return cfg
 
 
