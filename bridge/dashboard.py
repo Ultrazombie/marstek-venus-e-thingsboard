@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "61"
+VERSION = "62"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,

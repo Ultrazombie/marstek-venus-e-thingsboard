@@ -136,6 +136,7 @@ self.onInit = function() {
     var image = (self.ctx.settings || {}).image;
     el.innerHTML =
         '<div class="mb-card idle">' +
+        '<div class="mb-halo mb-halo-green"></div><div class="mb-halo mb-halo-warm"></div><div class="mb-bloom"></div>' +
         '<div class="mb-motes">' + MOTES.map(function(m) {
             return '<span class="mb-mote" style="left:' + m[0] + '%;--t:' + m[1] + 's;--d:-' + m[2] + 's"></span>';
         }).join('') + '</div><div class="mb-floor"></div>' +
@@ -144,8 +145,7 @@ self.onInit = function() {
         '<div class="mb-runtime"></div>' +
         '<div class="mb-track"><div class="mb-fill"></div><div class="mb-sheen"></div><div class="mb-marker"></div></div>' +
         '<div class="mb-foot"><span class="mb-foot-value"></span><span class="mb-reserve"></span></div>' +
-        (image ? '<div class="mb-device"><div class="mb-halo mb-halo-green"></div><div class="mb-halo mb-halo-warm"></div>' +
-            '<div class="mb-bloom"></div><img class="mb-img" alt="Battery" src="' + image + '">' + LEDS.map(function(p, i) {
+        (image ? '<div class="mb-device"><img class="mb-img" alt="Battery" src="' + image + '">' + LEDS.map(function(p, i) {
             return '<span class="mb-led" style="left:' + p[0] + '%;top:' + p[1] + '%;--d:' + (i % 3) * .22 + 's"></span>';
         }).join('') + '</div>' : '') + '</div>';
     timer = setInterval(age, 15000);

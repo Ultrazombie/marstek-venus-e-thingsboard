@@ -9,22 +9,27 @@
 .mb-card.clickable { cursor: pointer; }
 .mb-head, .mb-main, .mb-runtime, .mb-track, .mb-foot { position: relative; z-index: 3; }
 
-/* Light behind the battery: it fades out inside the widget, so there is no edge to see. */
-.mb-halo { position: absolute; left: -60%; right: -60%; top: -30%; bottom: 0; opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
-.mb-halo-green { background: radial-gradient(ellipse 31% 44.6% at 50% 55%, rgba(110, 231, 160, .58) 0%, rgba(110, 231, 160, .47) 45%, rgba(52, 178, 136, .32) 68%, rgba(0, 105, 92, .12) 86%, rgba(0, 105, 92, 0) 100%); }
-.mb-halo-warm { background: radial-gradient(ellipse 31% 44.6% at 50% 55%, rgba(232, 177, 112, .5) 0%, rgba(232, 177, 112, .4) 45%, rgba(176, 120, 70, .27) 68%, rgba(110, 70, 40, .1) 86%, rgba(110, 70, 40, 0) 100%); }
-.mb-card.idle .mb-halo-green { opacity: .86; animation: mb-rest 9s ease-in-out infinite; }
+/* Light on the wall behind the battery: it reaches nothing at the widget edges, so there is no line to see. */
+.mb-halo { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
+.mb-halo-green { background: radial-gradient(ellipse 47% 45% at 51% 54%,
+  rgba(84, 206, 150, .48) 0%, rgba(84, 206, 150, .432) 30%,
+  rgba(44, 160, 124, .326) 52%, rgba(44, 160, 124, .202) 68%,
+  rgba(0, 105, 92, .096) 84%, rgba(0, 105, 92, .029) 94%, rgba(0, 105, 92, 0) 100%); }
+.mb-halo-warm { background: radial-gradient(ellipse 47% 45% at 51% 54%,
+  rgba(232, 177, 112, .24) 0%, rgba(232, 177, 112, .216) 30%,
+  rgba(176, 120, 70, .163) 52%, rgba(176, 120, 70, .101) 68%,
+  rgba(110, 70, 40, .048) 84%, rgba(110, 70, 40, .014) 94%, rgba(110, 70, 40, 0) 100%); }
+.mb-card.idle .mb-halo-green { opacity: .75; }
 .mb-card.charging .mb-halo-green { opacity: 1; animation: mb-breathe 4s ease-in-out infinite; }
 .mb-card.discharging .mb-halo-warm { opacity: 1; animation: mb-ember 6s ease-in-out infinite; }
-@keyframes mb-rest { 50% { transform: scale(1.015); } }
-@keyframes mb-breathe { 0%, 100% { filter: brightness(.72); transform: scale(.985); } 50% { filter: brightness(1.12); transform: scale(1.03); } }
+@keyframes mb-breathe { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
 @keyframes mb-ember { 0%, 100% { filter: brightness(1); } 35% { filter: brightness(.82); } 70% { filter: brightness(1.08); } }
 .mb-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 24%; background: radial-gradient(50% 42% at 54% 34%, rgba(0, 0, 0, .55), transparent); pointer-events: none; }
 
 /* One soft flash when the state changes. */
-.mb-bloom { position: absolute; left: -60%; right: -60%; top: -30%; bottom: 0; opacity: 0; pointer-events: none; background: radial-gradient(ellipse 31% 44.6% at 50% 55%, rgba(var(--mood), .5), transparent); }
+.mb-bloom { position: absolute; inset: 0; opacity: 0; pointer-events: none; background: radial-gradient(ellipse 47% 45% at 51% 54%, rgba(var(--mood), .28), transparent); }
 .mb-card.bloom .mb-bloom { animation: mb-bloom 1.6s ease-out; }
-@keyframes mb-bloom { 0% { opacity: 0; transform: scale(.82); } 22% { opacity: 1; } 100% { opacity: 0; transform: scale(1.14); } }
+@keyframes mb-bloom { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Motes drift up while charging and settle down while the battery gives energy away. */
 .mb-motes { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
