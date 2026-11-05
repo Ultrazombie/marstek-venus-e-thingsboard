@@ -17,6 +17,7 @@ PORT = int(os.environ.get("MARSTEK_PORT", "30000"))
 INTERVAL = float(os.environ.get("POLL_INTERVAL", "60"))
 TB_URL = os.environ["TB_URL"].rstrip("/")
 TB_ACCESS_TOKEN = os.environ.get("TB_ACCESS_TOKEN")
+TB_API_KEY = os.environ.get("TB_API_KEY")
 TB_USER = os.environ.get("TB_USER")
 TB_PASSWORD = os.environ.get("TB_PASSWORD")
 DEVICE_NAME = os.environ.get("TB_DEVICE_NAME", "Marstek Venus E")
@@ -50,14 +51,14 @@ def http(method, path, body=None, token=None, timeout=15):
         headers={"Content-Type": "application/json"},
     )
     if token:
-        req.add_header("X-Authorization", "Bearer " + token)
+        req.add_header("X-Authorization", ("ApiKey " if TB_API_KEY else "Bearer ") + token)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read()
         return json.loads(raw) if raw else None
 
 
 def provision():
-    jwt = http("POST", "/api/auth/login", {"username": TB_USER, "password": TB_PASSWORD})["token"]
+    jwt = TB_API_KEY or http("POST", "/api/auth/login", {"username": TB_USER, "password": TB_PASSWORD})["token"]
     try:
         dev = http("GET", "/api/tenant/devices?deviceName=" + urllib.parse.quote(DEVICE_NAME), token=jwt)
     except urllib.error.HTTPError as e:

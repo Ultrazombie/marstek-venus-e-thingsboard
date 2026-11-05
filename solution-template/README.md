@@ -9,7 +9,7 @@ cd solution-template
 NICKNAME=<creator nickname> python3 -I build.py
 ```
 
-Needs the local ThingsBoard from `../docker-compose.yml` (default `http://localhost:8081`, `tenant@thingsboard.org` / `tenant`; override with `TB_URL`, `TB_USER`, `TB_PASSWORD`). Output: `marstek-venus-e-1.0.0.zip` (the template) and `widgets/*.json` (one file per custom widget, for separate Widget uploads).
+Needs the local ThingsBoard from `../docker-compose.yml` (default `http://localhost:8081`, `tenant@thingsboard.org` / `tenant`; override with `TB_URL`, `TB_USER`, `TB_PASSWORD`, or `TB_API_KEY` for tenants without a password, such as Google sign-in). Output: `marstek-venus-e-1.0.0.zip` (the template) and `widgets/*.json` (one file per custom widget, for separate Widget uploads).
 
 ## Contents
 
