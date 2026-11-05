@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "50"
+VERSION = "51"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -217,7 +217,7 @@ def energy_chart_config(base, alias_id):
          "usePostProcessing": True, "postFuncBody": post,
          "settings": {"yAxisId": "default", "showInLegend": True, "dataHiddenByDefault": False, "type": "bar"}}
         for key, label, color in (("es_total_grid_input_energy", "Charged from grid", GREEN),
-                                  ("es_total_load_energy", "Battery output", ORANGE))]
+                                  ("battery_output_total", "Battery output", ORANGE))]
     cfg.update(title="Energy per day", titleIcon="bar_chart", iconColor=GREEN, showLegend=True,
                useDashboardTimewindow=False, timewindow=TW_DAILY_BARS)
     cfg["settings"]["showLegend"] = True

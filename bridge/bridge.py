@@ -26,7 +26,8 @@ STATE_FILE = os.environ.get("STATE_FILE", "/data/state.json")
 TZ = ZoneInfo(os.environ.get("TZ", "UTC"))
 # counter key -> telemetry prefix, section of the state file (None keeps the original top-level keys)
 ENERGY_COUNTERS = {"es_total_grid_input_energy": ("grid_input", None),
-                   "es_total_load_energy": ("battery_output", "battery_output")}
+                   "battery_output_total": ("battery_output", "battery_output")}
+OUTPUT_MAX_GAP = 300
 
 FAST_METHODS = ["ES.GetStatus", "ES.GetMode", "Bat.GetStatus"]
 SLOW_METHODS = ["Wifi.GetStatus"]
@@ -367,7 +368,29 @@ def rpc_loop(sock, token):
             print("rpc reply error:", e)
 
 
+def integrate_output(telemetry, now=None):
+    """Battery output in Wh from off-grid power: the battery's own load counter stayed at 0 under load."""
+    if "es_offgrid_power" not in telemetry:
+        return
+    power = max(0.0, float(telemetry["es_offgrid_power"]))
+    now = time.time() if now is None else now
+
+    def apply(root):
+        meter = root.setdefault("output_meter", {})
+        total = meter.get("total", 0.0)
+        if "ts" in meter and 0 < now - meter["ts"] <= OUTPUT_MAX_GAP:
+            total += (meter["power"] + power) / 2 * (now - meter["ts"]) / 3600
+        meter.update(ts=now, power=power, total=total)
+        telemetry["battery_output_total"] = total
+
+    update_state(apply)
+
+
 def add_period_energy(telemetry):
+    try:
+        integrate_output(telemetry)
+    except Exception as e:
+        print("output meter error:", e)
     for key, (prefix, section) in ENERGY_COUNTERS.items():
         if key in telemetry:
             try:
