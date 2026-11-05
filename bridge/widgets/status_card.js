@@ -123,7 +123,13 @@ self.onDataUpdated = function() {
             card.style.setProperty('--accent', st.color);
         }
     }
-    el.querySelector('.mv-value').textContent = shown;
+    var valueNode = el.querySelector('.mv-value');
+    if (valueNode.textContent !== '–' && valueNode.textContent !== String(shown)) {
+        valueNode.classList.remove('flash');
+        void valueNode.offsetWidth;
+        valueNode.classList.add('flash');
+    }
+    valueNode.textContent = shown;
     if (isNum && s.spark) {
         var series = [];
         d.forEach(function(p) {

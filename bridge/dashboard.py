@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "60"
+VERSION = "61"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -80,8 +80,8 @@ CUSTOM_SIZE = {"status_card": (6, 1), "battery": (12, 2), "flow": (8, 3), "grid_
 
 
 def image_uri(name):
-    with open(os.path.join(WIDGETS_DIR, "img", name + ".jpg"), "rb") as f:
-        return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+    with open(os.path.join(WIDGETS_DIR, "img", name + ".webp"), "rb") as f:
+        return "data:image/webp;base64," + base64.b64encode(f.read()).decode()
 
 
 def read(name, ext):
@@ -149,12 +149,12 @@ def style_chart(cfg, ticks=None):
     font = lambda size: {"family": FONT, "size": size, "sizeUnit": "px", "style": "normal", "weight": "400", "lineHeight": "1.3"}
     cfg.update(backgroundColor="rgba(0,0,0,0)", color=TEXT, dropShadow=False, borderRadius="0px", showTitleIcon=False,
                displayTimewindow=False, titleColor=MUTED, titleFont=font(12),
-               titleStyle={"textTransform": "uppercase", "letterSpacing": ".14em", "fontWeight": "400"})
+               padding="8px 18px", titleStyle={"text-transform": "uppercase", "letter-spacing": ".14em", "font-weight": "400"})
     settings = cfg["settings"]
     settings["background"] = {"type": "color", "color": "rgba(0,0,0,0)",
                               "overlay": {"enabled": False, "color": "rgba(0,0,0,0)", "blur": 3}}
     settings.update(legendLabelColor=MUTED, legendLabelFont=font(12), tooltipBackgroundColor="rgba(18,19,21,.94)",
-                    tooltipLabelColor=TEXT, tooltipValueColor=TEXT, tooltipDateColor=MUTED, padding="8px 12px")
+                    tooltipLabelColor=TEXT, tooltipValueColor=TEXT, tooltipDateColor=MUTED, padding="0")
     for axis in settings["yAxes"].values():
         axis.update(showLine=False, showTicks=False, showSplitLines=True, splitLinesColor="rgba(255,255,255,.05)",
                     tickLabelColor=AXIS, tickLabelFont=font(11), labelColor=AXIS)
@@ -180,7 +180,7 @@ BATTERY_VIEW_KEYS = {"es_ongrid_power", "es_offgrid_power"}
 
 def series_key(key, y_axis="default", fill=True, legend=False):
     title, _, units, decimals, color, div, _ = CHART_SPECS[key]
-    area = {"type": "gradient", "opacity": 1, "gradient": {"start": 22, "end": 0}} if fill else {"type": "none"}
+    area = {"type": "gradient", "opacity": 1, "gradient": {"start": 12, "end": 0}} if fill else {"type": "none"}
     data_key = {"name": key, "type": "timeseries", "label": title, "color": color,
                 "units": units, "decimals": decimals,
                 "settings": {"yAxisId": y_axis, "showInLegend": legend, "dataHiddenByDefault": False,
@@ -289,7 +289,7 @@ def build(configs, custom, alias_id, grid_alias=None):
         "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
         "openInSeparateDialog": True, "dialogTitle": CHART_SPECS["es_bat_soc"][0],
         "dialogHideDashboardToolbar": True}]}
-    cfg["settings"] = {"image": image_uri("battery_dark")}
+    cfg["settings"] = {"image": image_uri("battery_cut")}
 
     top = 2
     if grid_alias:
@@ -331,8 +331,8 @@ def build(configs, custom, alias_id, grid_alias=None):
     cfg["datasources"] = datasource(alias_id, [(n, n, SILVER) for n in ("es_ongrid_power", "es_offgrid_power", "es_bat_soc")])
     add(custom["flow"], "timeseries", cfg, right, 2, top, HERO_COLS)
     add("system.time_series_chart", "timeseries", chart_config(base, alias_id, "es_bat_soc"), right, 3, top + 2, HERO_COLS)
-    add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id), right, 2, top + 5, HERO_COLS)
-    add("system.time_series_chart", "timeseries", energy_chart_config(base, alias_id), right, 3, top + 7, HERO_COLS)
+    add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id), right, 3, top + 5, HERO_COLS)
+    add("system.time_series_chart", "timeseries", energy_chart_config(base, alias_id), right, 2, top + 8, HERO_COLS)
 
     cfg = custom_cfg()
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}

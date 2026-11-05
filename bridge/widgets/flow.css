@@ -10,6 +10,10 @@
 .mf-node { flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 19px; }
 .mf-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .28); transition: background .4s, box-shadow .4s; }
 .mf-node.active .mf-dot { background: var(--flow); box-shadow: 0 0 8px var(--flow); }
+.mf-dot { position: relative; }
+.mf-node.active .mf-dot::after { content: ''; position: absolute; inset: -1px; border-radius: 50%; border: 1px solid var(--flow); animation: mf-ring 2.2s ease-out infinite; }
+@keyframes mf-ring { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(4.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mf-node.active .mf-dot::after { animation: none; opacity: 0; } }
 .mf-name { font-size: 12px; color: #8A8F94; }
 .mf-soc { color: #E8E6E1; margin-left: 4px; }
 .mf-link { flex: 1; min-width: 28px; display: flex; flex-direction: column; align-items: center; }
@@ -19,7 +23,7 @@
 .mf-link.on .mf-line::after {
   content: ''; position: absolute; top: 0; bottom: 0; width: 72px; left: -72px;
   background: linear-gradient(90deg, transparent, var(--flow), transparent);
-  animation: mf-forward 2.6s linear infinite;
+  animation: mf-forward var(--speed, 2.6s) linear infinite;
 }
 .mf-link.on.reverse .mf-line::after { animation-direction: reverse; }
 .mf-dir { margin-top: 8px; font-size: 12px; color: #8A8F94; min-height: 15px; white-space: nowrap; }

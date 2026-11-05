@@ -1,4 +1,6 @@
-var el, timer, lastTs;
+var el, timer, lastTs, mood, shownSoc = null, shownKwh = null, tweens = {};
+var LEDS = [[38.1, 16.8], [41.5, 16.9], [44.8, 17], [70.4, 17.4], [73.5, 17.5], [76.5, 17.6]];
+var MOTES = [[20, 7.5, 0], [31, 9, 2.4], [42, 6.5, 4.6], [58, 8.5, 1.2], [69, 7, 3.4], [80, 9.5, .6], [88, 8, 5.2], [12, 10, 3.9]];
 var STALE_SEC = 180;
 var RATE_WINDOW_MS = 3600000, RATE_MIN_SPAN_MS = 1800000, RATE_MIN_WH = 5;
 var LOAD_WINDOW_MS = 600000, FLOW_MIN_W = 2;
@@ -66,8 +68,29 @@ function age() {
 
 function setMood(card) {
     var grid = lastValue('es_ongrid_power') || 0, off = lastValue('es_offgrid_power') || 0;
-    var mood = grid < -FLOW_MIN_W ? 'charging' : (grid > FLOW_MIN_W || off > FLOW_MIN_W) ? 'discharging' : 'idle';
-    ['charging', 'discharging', 'idle'].forEach(function(m) { card.classList.toggle(m, m === mood); });
+    var next = grid < -FLOW_MIN_W ? 'charging' : (grid > FLOW_MIN_W || off > FLOW_MIN_W) ? 'discharging' : 'idle';
+    ['charging', 'discharging', 'idle'].forEach(function(m) { card.classList.toggle(m, m === next); });
+    if (mood && mood !== next) {
+        card.classList.remove('bloom');
+        void card.offsetWidth;
+        card.classList.add('bloom');
+    }
+    mood = next;
+}
+
+// Numbers roll to their new value instead of jumping.
+function roll(key, from, to, write) {
+    if (tweens[key]) { cancelAnimationFrame(tweens[key]); }
+    var quiet = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (quiet || from === to) { write(to); return; }
+    var start = null, length = 1000;
+    function step(ts) {
+        if (start === null) { start = ts; }
+        var t = Math.min(1, (ts - start) / length), eased = 1 - Math.pow(1 - t, 3);
+        write(from + (to - from) * eased);
+        tweens[key] = t < 1 ? requestAnimationFrame(step) : null;
+    }
+    tweens[key] = requestAnimationFrame(step);
 }
 
 function render() {
@@ -79,21 +102,28 @@ function render() {
     var reserve = reservePercent();
     setMood(card);
     card.style.setProperty('--accent', reserve !== null && soc <= reserve ? '#D9694F' : '#6EE7A0');
-    el.querySelector('.mb-value').textContent = Math.round(soc);
+    var valueNode = el.querySelector('.mb-value');
+    roll('soc', shownSoc === null ? 0 : shownSoc, Math.round(soc), function(v) { valueNode.textContent = Math.round(v); });
+    shownSoc = Math.round(soc);
     el.querySelector('.mb-hint').textContent = hint(soc, reserve);
-    el.querySelector('.mb-fill').style.width = Math.max(0, Math.min(100, soc)) + '%';
+    var level = Math.max(0, Math.min(100, soc)) + '%';
+    el.querySelector('.mb-fill').style.width = level;
+    el.querySelector('.mb-sheen').style.width = level;
 
     var marker = el.querySelector('.mb-marker');
     marker.style.display = reserve === null ? 'none' : 'block';
     if (reserve !== null) { marker.style.left = reserve + '%'; }
     el.querySelector('.mb-reserve').textContent = reserve === null ? '' : 'Reserve ' + reserve + '%';
 
-    var usable = '';
     if (stored !== null) {
-        usable = reserve !== null && rated ?
-            (Math.max(0, stored - reserve / 100 * rated) / 1000).toFixed(2) + ' kWh usable' : (stored / 1000).toFixed(2) + ' kWh stored';
+        var hasReserve = reserve !== null && rated;
+        var kwh = (hasReserve ? Math.max(0, stored - reserve / 100 * rated) : stored) / 1000;
+        var footNode = el.querySelector('.mb-foot-value');
+        roll('kwh', shownKwh === null ? 0 : shownKwh, kwh, function(v) {
+            footNode.textContent = v.toFixed(2) + (hasReserve ? ' kWh usable' : ' kWh stored');
+        });
+        shownKwh = kwh;
     }
-    el.querySelector('.mb-foot-value').textContent = usable;
     el.querySelector('.mb-runtime').textContent = runtimeText(stored, rated, reserve);
 
     var d = series('es_bat_soc');
@@ -106,13 +136,18 @@ self.onInit = function() {
     var image = (self.ctx.settings || {}).image;
     el.innerHTML =
         '<div class="mb-card idle">' +
+        '<div class="mb-motes">' + MOTES.map(function(m) {
+            return '<span class="mb-mote" style="left:' + m[0] + '%;--t:' + m[1] + 's;--d:-' + m[2] + 's"></span>';
+        }).join('') + '</div><div class="mb-floor"></div>' +
         '<div class="mb-head"><span class="mb-label">Battery</span><span class="mb-updated"></span></div>' +
         '<div class="mb-main"><span class="mb-value">–</span><span class="mb-unit">%</span><span class="mb-hint"></span></div>' +
         '<div class="mb-runtime"></div>' +
-        '<div class="mb-track"><div class="mb-fill"></div><div class="mb-marker"></div></div>' +
+        '<div class="mb-track"><div class="mb-fill"></div><div class="mb-sheen"></div><div class="mb-marker"></div></div>' +
         '<div class="mb-foot"><span class="mb-foot-value"></span><span class="mb-reserve"></span></div>' +
-        '<div class="mb-stage"><div class="mb-glow"></div>' +
-        (image ? '<img class="mb-img" alt="Battery" src="' + image + '">' : '') + '</div></div>';
+        (image ? '<div class="mb-device"><div class="mb-halo mb-halo-green"></div><div class="mb-halo mb-halo-warm"></div>' +
+            '<div class="mb-bloom"></div><img class="mb-img" alt="Battery" src="' + image + '">' + LEDS.map(function(p, i) {
+            return '<span class="mb-led" style="left:' + p[0] + '%;top:' + p[1] + '%;--d:' + (i % 3) * .22 + 's"></span>';
+        }).join('') + '</div>' : '') + '</div>';
     timer = setInterval(age, 15000);
 
     var descriptors = self.ctx.actionsApi.getActionDescriptors('cardClick');
@@ -134,6 +169,7 @@ self.onLatestDataUpdated = render;
 
 self.onDestroy = function() {
     clearInterval(timer);
+    Object.keys(tweens).forEach(function(k) { if (tweens[k]) { cancelAnimationFrame(tweens[k]); } });
 };
 
 self.typeParameters = function() {

@@ -19,6 +19,8 @@ function setLink(id, watts, reverse, color, label) {
     link.style.setProperty('--flow', color);
     link.querySelector('.mf-watts').textContent = watts === null ? '–' : Math.round(Math.abs(watts)) + ' W';
     link.querySelector('.mf-dir').textContent = on ? label : '';
+    // More power, faster pulse.
+    link.style.setProperty('--speed', on ? Math.max(.9, 3.2 - Math.abs(watts) / 1000 * 2.3).toFixed(2) + 's' : '3s');
     return on;
 }
 
