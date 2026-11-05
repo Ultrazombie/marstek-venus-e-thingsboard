@@ -7,16 +7,15 @@ function esc(s) {
     });
 }
 
-var GREEN = '#4caf50', ORANGE = '#ff9800', RED = '#f44336', BLUE = '#2196f3', GREY = '#90a4ae';
+var CHARGE = '#6EE7A0', WARM = '#E8B170', CORAL = '#D9694F', MUTED = '#8A8F94';
 
 function state(kind, v) {
     if (kind === 'grid') {
-        return v > 0 ? { color: RED, hint: 'Exporting to grid' } :
-               v < 0 ? { color: GREEN, hint: 'Charging' } : { color: GREY, hint: 'Idle' };
+        return v > 0 ? { color: WARM, hint: 'To grid' } : v < 0 ? { color: CHARGE, hint: 'Charging' } : { color: MUTED, hint: 'Idle' };
     }
     if (kind === 'temp') {
-        return v < 5 ? { color: BLUE, hint: 'Cold' } : v < 40 ? { color: GREEN, hint: 'Normal' } :
-               v < 50 ? { color: ORANGE, hint: 'Warm' } : { color: RED, hint: 'Hot' };
+        return v < 5 ? { color: MUTED, hint: 'Cold' } : v < 40 ? { color: MUTED, hint: 'Normal' } :
+               v < 50 ? { color: WARM, hint: 'Warm' } : { color: CORAL, hint: 'Hot' };
     }
     return null;
 }
@@ -42,8 +41,6 @@ self.onInit = function() {
     el = self.ctx.$container[0].querySelector('.mv-root');
     el.innerHTML =
         '<div class="mv-card' + (s.gear ? ' has-gear' : '') + '" style="--accent:' + esc(s.color || '#2196f3') + '">' +
-        (s.image ? '<img class="mv-bg" alt="" src="' + s.image + '">' : '') +
-        '<div class="mv-icon"><span class="material-icons">' + esc(s.icon || 'bolt') + '</span></div>' +
         '<div class="mv-body">' +
         '<div class="mv-head"><span class="mv-label">' + esc(s.label) + '</span><span class="mv-updated"></span></div>' +
         '<div class="mv-main"><span class="mv-value">–</span><span class="mv-unit">' + esc(s.units) + '</span>' +

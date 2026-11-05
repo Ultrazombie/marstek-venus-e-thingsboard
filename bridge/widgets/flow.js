@@ -1,6 +1,6 @@
 var el, timer, lastTs;
 var STALE_SEC = 180, IDLE_W = 2;
-var CHARGE = '#4caf50', DISCHARGE = '#ff9800', LOAD = '#2196f3';
+var GRID = '#C9CDD1', LOAD = '#E8B170';
 
 function last(name) {
     var row = (self.ctx.data || []).filter(function(d) { return d.dataKey && d.dataKey.name === name; })[0];
@@ -40,7 +40,7 @@ function render() {
     if (!el) { return; }
     var grid = last('es_ongrid_power'), off = last('es_offgrid_power'), soc = last('es_bat_soc');
     var charging = grid !== null && grid < 0;
-    var gridColor = charging ? CHARGE : DISCHARGE;
+    var gridColor = charging ? GRID : LOAD;
     var gridOn = setLink('.mf-grid', grid, !charging, gridColor, charging ? 'Charging' : 'To grid');
     var offOn = setLink('.mf-load', off, false, LOAD, 'To sockets');
     setNode('.mf-n-grid', gridOn, gridColor);
@@ -48,22 +48,21 @@ function render() {
     setNode('.mf-n-bat', gridOn || offOn, gridOn ? gridColor : LOAD);
     el.querySelector('.mf-soc').textContent = soc === null ? '–' : Math.round(soc) + '%';
     var stale = age();
-    el.querySelector('.mf-status').textContent = stale ? 'No fresh data' : gridOn || offOn ? 'Energy flowing' : 'Idle, no energy flowing';
+    el.querySelector('.mf-status').textContent = stale ? 'No fresh data' : gridOn || offOn ? 'Flowing' : 'Idle';
 }
 
 self.onInit = function() {
     el = self.ctx.$container[0].querySelector('.mf-root');
-    function node(cls, icon, name, extra) {
-        return '<div class="mf-node ' + cls + '"><div class="mf-circle"><span class="material-icons">' + icon + '</span></div>' +
-            (extra || '') + '<div class="mf-name">' + name + '</div></div>';
+    function node(cls, name, extra) {
+        return '<div class="mf-node ' + cls + '"><div class="mf-dot"></div><div class="mf-name">' + name + (extra || '') + '</div></div>';
     }
     function link(cls) {
         return '<div class="mf-link ' + cls + '"><div class="mf-watts"></div><div class="mf-line"></div><div class="mf-dir"></div></div>';
     }
     el.innerHTML = '<div class="mf-card"><div class="mf-head"><span class="mf-title">Energy flow</span><span class="mf-status"></span></div>' +
-        '<div class="mf-diagram">' + node('mf-n-grid', 'electrical_services', 'Grid') + link('mf-grid') +
-        node('mf-n-bat', 'battery_charging_full', 'Battery', '<div class="mf-soc">–</div>') + link('mf-load') +
-        node('mf-n-load', 'power', 'Sockets') + '</div></div>';
+        '<div class="mf-diagram">' + node('mf-n-grid', 'Grid') + link('mf-grid') +
+        node('mf-n-bat', 'Battery', '<span class="mf-soc">–</span>') + link('mf-load') +
+        node('mf-n-load', 'Sockets') + '</div></div>';
     timer = setInterval(render, 15000);
     render();
 };
