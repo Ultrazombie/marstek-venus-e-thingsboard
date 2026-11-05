@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "47"
+VERSION = "49"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -149,6 +149,10 @@ def add_reserve_line(cfg, units, decimals, y_axis="default"):
          "startSymbol": "none", "endSymbol": "none", "showLabel": True, "labelPosition": "end", "labelColor": RED}]
 
 
+# The battery reports output as positive; charts show charging going up and discharging going down.
+BATTERY_VIEW_KEYS = {"es_ongrid_power", "es_offgrid_power"}
+
+
 def series_key(key, y_axis="default", fill=True, legend=False):
     title, _, units, decimals, color, div, _ = CHART_SPECS[key]
     area = {"type": "gradient", "opacity": 0.15, "gradient": {"start": 55, "end": 0}} if fill else {"type": "none"}
@@ -161,6 +165,8 @@ def series_key(key, y_axis="default", fill=True, legend=False):
                                               "fillAreaSettings": area}}}
     if div:
         data_key.update(usePostProcessing=True, postFuncBody="return value / %d;" % div)
+    if key in BATTERY_VIEW_KEYS:
+        data_key.update(usePostProcessing=True, postFuncBody="return value ? -value : 0;")
     return data_key
 
 
@@ -193,7 +199,7 @@ def power_chart_config(base, alias_id):
     cfg["datasources"][0]["dataKeys"] = [
         series_key("es_ongrid_power", fill=False, legend=True),
         series_key("es_offgrid_power", fill=False, legend=True)]
-    cfg.update(title="Power (+ discharge / − charge)", titleIcon="bolt", iconColor=ORANGE, showLegend=True)
+    cfg.update(title="Power (+ charge / − discharge)", titleIcon="bolt", iconColor=ORANGE, showLegend=True)
     cfg["settings"]["showLegend"] = True
     cfg["settings"]["legendConfig"].update(position="top", direction="row", showMin=False, showMax=False,
                                            showAvg=False, showTotal=False, showLatest=False)

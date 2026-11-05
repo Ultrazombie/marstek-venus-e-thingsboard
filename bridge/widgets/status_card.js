@@ -115,7 +115,9 @@ self.onDataUpdated = function() {
     var shown = raw;
     if (isNum) {
         var v = s.divisor ? num / s.divisor : num;
-        shown = s.decimals != null ? v.toFixed(s.decimals) : String(v);
+        // grid power direction is spelled out by the hint, so show the size only
+        var size = s.kind === 'grid' ? Math.abs(v) : v;
+        shown = s.decimals != null ? size.toFixed(s.decimals) : String(size);
         num = v;
         var st = state(s.kind, v);
         if (st) {
