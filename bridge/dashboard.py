@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "46"
+VERSION = "47"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -30,7 +30,6 @@ GRID = {"backgroundColor": "#eeeeee", "columns": COLS, "margin": 10, "outerMargi
 
 BLUE, GREEN, ORANGE, RED, GREY = "#2196f3", "#4caf50", "#ff9800", "#f44336", "#607d8b"
 
-MAX_POWER = 2500
 CHART_ROWS = 4
 LEFT_COLS = 16
 # Optional device whose telemetry key is above 0 while mains power is present; adds a timeline strip.
@@ -68,8 +67,7 @@ CHART_SPECS = {
     "grid_output_day": ("Grid output today", "today", "kWh", 2, ORANGE, 1000, []),
     "grid_output_month": ("Grid output month", "calendar_month", "kWh", 2, ORANGE, 1000, []),
 }
-Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60),
-           "es_ongrid_power": (-MAX_POWER, MAX_POWER), "es_offgrid_power": (0, MAX_POWER)}
+Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
 CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "flow": "Marstek energy flow",
@@ -199,7 +197,6 @@ def power_chart_config(base, alias_id):
     cfg["settings"]["showLegend"] = True
     cfg["settings"]["legendConfig"].update(position="top", direction="row", showMin=False, showMax=False,
                                            showAvg=False, showTotal=False, showLatest=False)
-    cfg["settings"]["yAxes"]["default"]["interval"] = MAX_POWER / 2
     for threshold in cfg["settings"]["thresholds"]:
         threshold["showLabel"] = False
     return cfg
