@@ -352,6 +352,7 @@ function render() {
 
 self.onInit = function() {
     root = self.ctx.$container[0].querySelector('.mc-root');
+    root.classList.toggle('dark', (self.ctx.settings || {}).theme !== 'light');
     root.innerHTML =
         '<div class="mc-panel"><div class="mc-head"><div class="mc-status"></div>' +
         '<label class="mc-switch" title="When off, nothing can send energy from the battery to the grid">' +

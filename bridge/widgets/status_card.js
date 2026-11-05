@@ -7,7 +7,7 @@ function esc(s) {
     });
 }
 
-var CHARGE = '#6EE7A0', WARM = '#E8B170', CORAL = '#D9694F', MUTED = '#8A8F94';
+var CHARGE, WARM, CORAL, MUTED;
 
 function state(kind, v) {
     if (kind === 'grid') {
@@ -37,10 +37,15 @@ function age() {
 
 self.onInit = function() {
     var s = self.ctx.settings || {};
+    var light = s.theme === 'light';
+    CHARGE = light ? '#0B7A53' : '#6EE7A0';
+    WARM = light ? '#A85A12' : '#E8B170';
+    CORAL = light ? '#B23A22' : '#D9694F';
+    MUTED = light ? '#5E6266' : '#8A8F94';
     gradId = 'mvg' + Math.random().toString(36).slice(2);
     el = self.ctx.$container[0].querySelector('.mv-root');
     el.innerHTML =
-        '<div class="mv-card' + (s.gear ? ' has-gear' : '') + '" style="--accent:' + esc(s.color || '#2196f3') + '">' +
+        '<div class="mv-card' + (s.gear ? ' has-gear' : '') + (s.theme === 'light' ? ' light' : '') + '" style="--accent:' + esc(s.color || '#2196f3') + '">' +
         '<div class="mv-body">' +
         '<div class="mv-head"><span class="mv-label">' + esc(s.label) + '</span><span class="mv-updated"></span></div>' +
         '<div class="mv-main"><span class="mv-value">–</span><span class="mv-unit">' + esc(s.units) + '</span>' +

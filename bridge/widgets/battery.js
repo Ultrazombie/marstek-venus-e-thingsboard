@@ -101,6 +101,15 @@ function roll(key, from, to, write) {
     tweens[key] = requestAnimationFrame(step);
 }
 
+// The page colour and charts belong to a dashboard state, so a theme is a pair of states.
+function syncTheme() {
+    var mine = (self.ctx.settings || {}).theme === 'light' ? 'light' : 'dark', want = MarstekTheme.resolve();
+    var states = self.ctx.stateController;
+    if (want === mine || !states) { return; }
+    var target = want === 'light' ? 'default_day' : 'default';
+    if (states.getStateId() !== target) { states.updateState(target, states.getStateParams()); }
+}
+
 function render() {
     if (!el) { return; }
     var soc = lastValue('es_bat_soc');
@@ -109,7 +118,8 @@ function render() {
     var stored = lastValue('bat_bat_capacity'), rated = lastValue('bat_rated_capacity');
     var reserve = reservePercent();
     setMood(card);
-    card.style.setProperty('--accent', reserve !== null && soc <= reserve ? '#D9694F' : '#6EE7A0');
+    var light = (self.ctx.settings || {}).theme === 'light';
+    card.style.setProperty('--accent', reserve !== null && soc <= reserve ? (light ? '#B23A22' : '#D9694F') : (light ? '#0B7A53' : '#6EE7A0'));
     var valueNode = el.querySelector('.mb-value');
     roll('soc', shownSoc === null ? 0 : shownSoc, Math.round(soc), function(v) { valueNode.textContent = Math.round(v); });
     shownSoc = Math.round(soc);
@@ -143,7 +153,7 @@ self.onInit = function() {
     el = self.ctx.$container[0].querySelector('.mb-root');
     var image = (self.ctx.settings || {}).image;
     el.innerHTML =
-        '<div class="mb-card idle">' +
+        '<div class="mb-card idle' + ((self.ctx.settings || {}).theme === 'light' ? ' light' : '') + '">' +
         '<div class="mb-halo mb-halo-green"></div><div class="mb-halo mb-halo-warm"></div><div class="mb-bloom"></div>' +
         '<div class="mb-motes">' + MOTES.map(function(m) {
             return '<span class="mb-mote" style="left:' + m[0] + '%;--t:' + m[1] + 's;--d:-' + m[2] + 's"></span>';
@@ -156,7 +166,9 @@ self.onInit = function() {
         (image ? '<div class="mb-device"><img class="mb-img" alt="Battery" src="' + image + '">' + LEDS.map(function(p, i) {
             return '<span class="mb-led" style="left:' + p[0] + '%;top:' + p[1] + '%;--d:' + (i % 3) * .22 + 's"></span>';
         }).join('') + '</div>' : '') + '</div>';
-    timer = setInterval(age, 15000);
+    timer = setInterval(function() { age(); syncTheme(); }, 15000);
+    window.addEventListener('marstek-theme', syncTheme);
+    syncTheme();
 
     var descriptors = self.ctx.actionsApi.getActionDescriptors('cardClick');
     if (descriptors && descriptors.length) {
@@ -177,6 +189,7 @@ self.onLatestDataUpdated = render;
 
 self.onDestroy = function() {
     clearInterval(timer);
+    window.removeEventListener('marstek-theme', syncTheme);
     Object.keys(tweens).forEach(function(k) { if (tweens[k]) { cancelAnimationFrame(tweens[k]); } });
 };
 

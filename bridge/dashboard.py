@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "64"
+VERSION = "70"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -25,13 +25,19 @@ POPUP_WINDOW = {"grid_input_month": TW_MONTH, "battery_output_month": TW_MONTH}
 POPUP_ROWS = 16
 ROW_SCALE = 1
 CARD_ROWS = 1
-SETTINGS_ROWS = 5
-GRID = {"backgroundColor": "#0B0C0D", "columns": COLS, "margin": 6, "outerMargin": True,
-        "backgroundSizeMode": "100%"}
-LIGHT_STATES = {"controls", "settings"}
+SETTINGS_ROWS = 8
+GRID = {"columns": COLS, "margin": 6, "outerMargin": True, "backgroundSizeMode": "100%"}
 
-TEXT, MUTED, AXIS = "#E8E6E1", "#8A8F94", "#7A7F85"
-CHARGE, SILVER, WARM, CORAL = "#6EE7A0", "#C9CDD1", "#E8B170", "#D9694F"
+PALETTES = {
+    "dark": {"PAGE": "#0B0C0D", "TEXT": "#E8E6E1", "MUTED": "#8A8F94", "AXIS": "#7A7F85", "CHARGE": "#6EE7A0", "SILVER": "#C9CDD1",
+             "WARM": "#E8B170", "CORAL": "#D9694F", "SPLIT": "rgba(255,255,255,.05)", "ZERO": "rgba(255,255,255,.18)",
+             "RESERVE": "rgba(217,105,79,.6)", "TOOLTIP": "rgba(18,19,21,.94)", "IMAGE": "battery_cut"},
+    "light": {"PAGE": "#E4E1DA", "TEXT": "#17181A", "MUTED": "#5E6266", "AXIS": "#5E6266", "CHARGE": "#0B7A53", "SILVER": "#55595E",
+              "WARM": "#A85A12", "CORAL": "#B23A22", "SPLIT": "rgba(0,0,0,.07)", "ZERO": "rgba(0,0,0,.25)",
+              "RESERVE": "rgba(178,58,34,.6)", "TOOLTIP": "rgba(241,238,232,.96)", "IMAGE": "battery_light"},
+}
+THEME = "dark"
+PAL = PALETTES[THEME]
 FONT = "IBM Plex Sans, Roboto, sans-serif"
 WIDGET_NS = os.environ.get("TB_WIDGET_NAMESPACE", "marstek")
 
@@ -41,32 +47,51 @@ CARD_COLS = 4
 GRID_DEVICE = os.environ.get("TB_GRID_DEVICE")
 GRID_KEY = os.environ.get("TB_GRID_KEY", "power")
 
-# label, key, units, decimals, icon, color, divisor, kind, sparkline range, (row, col, width)
-CARDS = [
-    ("Mode", "es_mode", "", None, "tune", SILVER, None, "mode", None, (0, HERO_COLS, CARD_COLS)),
-    ("Grid", "es_ongrid_power", "W", 0, "bolt", SILVER, None, "grid", None, (0, HERO_COLS + CARD_COLS, CARD_COLS)),
-    ("Sockets", "es_offgrid_power", "W", 0, "power", WARM, None, None, None, (0, HERO_COLS + 2 * CARD_COLS, CARD_COLS)),
-    ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", MUTED, None, "temp", None, (0, HERO_COLS + 3 * CARD_COLS, CARD_COLS)),
-    ("Grid input today", "grid_input_day", "kWh", 2, "today", SILVER, 1000, None, None, (1, HERO_COLS, CARD_COLS)),
-    ("Battery output today", "battery_output_day", "kWh", 2, "today", WARM, 1000, None, None, (1, HERO_COLS + CARD_COLS, CARD_COLS)),
-    ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", SILVER, 1000, None, None, (1, HERO_COLS + 2 * CARD_COLS, CARD_COLS)),
-    ("Battery output month", "battery_output_month", "kWh", 2, "calendar_month", WARM, 1000, None, None, (1, HERO_COLS + 3 * CARD_COLS, CARD_COLS)),
-]
+def cards():
+    SILVER, WARM, MUTED = PAL["SILVER"], PAL["WARM"], PAL["MUTED"]
+    # label, key, units, decimals, icon, color, divisor, kind, sparkline range, (row, col, width)
+    return [
+        ("Mode", "es_mode", "", None, "tune", SILVER, None, "mode", None, (0, HERO_COLS, CARD_COLS)),
+        ("Grid", "es_ongrid_power", "W", 0, "bolt", SILVER, None, "grid", None, (0, HERO_COLS + CARD_COLS, CARD_COLS)),
+        ("Sockets", "es_offgrid_power", "W", 0, "power", WARM, None, None, None, (0, HERO_COLS + 2 * CARD_COLS, CARD_COLS)),
+        ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", MUTED, None, "temp", None, (0, HERO_COLS + 3 * CARD_COLS, CARD_COLS)),
+        ("Grid input today", "grid_input_day", "kWh", 2, "today", SILVER, 1000, None, None, (1, HERO_COLS, CARD_COLS)),
+        ("Battery output today", "battery_output_day", "kWh", 2, "today", WARM, 1000, None, None, (1, HERO_COLS + CARD_COLS, CARD_COLS)),
+        ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", SILVER, 1000, None, None, (1, HERO_COLS + 2 * CARD_COLS, CARD_COLS)),
+        ("Battery output month", "battery_output_month", "kWh", 2, "calendar_month", WARM, 1000, None, None, (1, HERO_COLS + 3 * CARD_COLS, CARD_COLS)),
+    ]
 
-STATE_NAMES = {"default": TITLE, "controls": "Battery control"}
 
-# key -> title, icon, units, decimals, colour, divisor, threshold lines (value, colour)
-CHART_SPECS = {
-    "es_bat_soc": ("Charge", "battery_full", "%", 0, CHARGE, None, []),
-    "es_ongrid_power": ("Grid", "bolt", "W", 0, SILVER, None, [(0, "rgba(255,255,255,.18)")]),
-    "es_offgrid_power": ("Sockets", "power", "W", 0, WARM, None, []),
-    "bat_bat_temp": ("Temperature", "thermostat", "°C", 1, MUTED, None, [(40, WARM), (50, CORAL)]),
-    "bat_bat_capacity": ("Stored energy", "battery_charging_full", "Wh", 0, CHARGE, None, []),
-    "grid_input_day": ("Grid input today", "today", "kWh", 2, SILVER, 1000, []),
-    "grid_input_month": ("Grid input month", "calendar_month", "kWh", 2, SILVER, 1000, []),
-    "battery_output_day": ("Battery output today", "today", "kWh", 2, WARM, 1000, []),
-    "battery_output_month": ("Battery output month", "calendar_month", "kWh", 2, WARM, 1000, []),
-}
+STATE_NAMES = {"default": TITLE, "controls": "Battery control", "settings": "Settings"}
+
+def chart_specs():
+    CHARGE, SILVER, WARM, MUTED, CORAL = PAL["CHARGE"], PAL["SILVER"], PAL["WARM"], PAL["MUTED"], PAL["CORAL"]
+    # key -> title, icon, units, decimals, colour, divisor, threshold lines (value, colour)
+    return {
+        "es_bat_soc": ("Charge", "battery_full", "%", 0, CHARGE, None, []),
+        "es_ongrid_power": ("Grid", "bolt", "W", 0, SILVER, None, [(0, PAL["ZERO"])]),
+        "es_offgrid_power": ("Sockets", "power", "W", 0, WARM, None, []),
+        "bat_bat_temp": ("Temperature", "thermostat", "°C", 1, MUTED, None, [(40, WARM), (50, CORAL)]),
+        "bat_bat_capacity": ("Stored energy", "battery_charging_full", "Wh", 0, CHARGE, None, []),
+        "grid_input_day": ("Grid input today", "today", "kWh", 2, SILVER, 1000, []),
+        "grid_input_month": ("Grid input month", "calendar_month", "kWh", 2, SILVER, 1000, []),
+        "battery_output_day": ("Battery output today", "today", "kWh", 2, WARM, 1000, []),
+        "battery_output_month": ("Battery output month", "calendar_month", "kWh", 2, WARM, 1000, []),
+    }
+
+
+def use_theme(theme):
+    global THEME, PAL, CHART_SPECS
+    THEME, PAL = theme, PALETTES[theme]
+    CHART_SPECS = chart_specs()
+
+
+def state_id(name):
+    """A theme is a set of states: the page colour and chart colours are fixed per state."""
+    return name if THEME == "dark" else name + "_day"
+
+
+CHART_SPECS = chart_specs()
 Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
@@ -96,7 +121,7 @@ def widget_body(name, namespace=None):
     descriptor = {
         "type": CUSTOM_TYPE[name], "sizeX": sx, "sizeY": sy, "resources": [],
         "templateHtml": read(name, "html"), "templateCss": read(name, "css"),
-        "controllerScript": (read("fonts", "js") if name == "battery" else "") + read(name, "js"),
+        "controllerScript": (read("fonts", "js") + read("theme", "js") if name in ("battery", "settings") else "") + read(name, "js"),
         "settingsSchema": "{}", "dataKeySettingsSchema": "{}", "settingsDirective": "",
         "defaultConfig": json.dumps({
             "datasources": [], "showTitle": False, "backgroundColor": "rgba(0, 0, 0, 0)",
@@ -147,6 +172,7 @@ def axis_limit(value):
 def style_chart(cfg, ticks=None):
     """Quiet chart: no vertical grid or axis lines, faint horizontals, one typeface."""
     font = lambda size: {"family": FONT, "size": size, "sizeUnit": "px", "style": "normal", "weight": "400", "lineHeight": "1.3"}
+    TEXT, MUTED, AXIS = PAL["TEXT"], PAL["MUTED"], PAL["AXIS"]
     cfg.update(backgroundColor="rgba(0,0,0,0)", color=TEXT, dropShadow=False, borderRadius="0px", showTitleIcon=False,
                displayTimewindow=False, titleColor=MUTED, titleFont=font(12),
                padding="8px 18px", titleStyle={"text-transform": "uppercase"},
@@ -155,10 +181,10 @@ def style_chart(cfg, ticks=None):
     settings = cfg["settings"]
     settings["background"] = {"type": "color", "color": "rgba(0,0,0,0)",
                               "overlay": {"enabled": False, "color": "rgba(0,0,0,0)", "blur": 3}}
-    settings.update(legendLabelColor=MUTED, legendLabelFont=font(12), tooltipBackgroundColor="rgba(18,19,21,.94)",
+    settings.update(legendLabelColor=MUTED, legendLabelFont=font(12), tooltipBackgroundColor=PAL["TOOLTIP"],
                     tooltipLabelColor=TEXT, tooltipValueColor=TEXT, tooltipDateColor=MUTED, padding="0")
     for axis in settings["yAxes"].values():
-        axis.update(showLine=False, showTicks=False, showSplitLines=True, splitLinesColor="rgba(255,255,255,.05)",
+        axis.update(showLine=False, showTicks=False, showSplitLines=True, splitLinesColor=PAL["SPLIT"],
                     tickLabelColor=AXIS, tickLabelFont=font(11), labelColor=AXIS)
     settings["xAxis"].update(showLine=False, showTicks=False, showSplitLines=False, tickLabelColor=AXIS, tickLabelFont=font(11),
                              ticksFormat=ticks or {})
@@ -168,12 +194,12 @@ def style_chart(cfg, ticks=None):
 def add_reserve_line(cfg, units, decimals, y_axis="default"):
     """Draw the backup reserve (100 - depth of discharge) from the last DOD known to ThingsBoard."""
     cfg["datasources"][0]["latestDataKeys"] = [
-        {"name": "dod", "type": "attribute", "label": "Backup reserve", "color": CORAL, "settings": {},
+        {"name": "dod", "type": "attribute", "label": "Backup reserve", "color": PAL["CORAL"], "settings": {},
          "usePostProcessing": True, "postFuncBody": "return 100 - value;"}]
     cfg["settings"]["thresholds"] = cfg["settings"]["thresholds"] + [
         {"type": "latestKey", "latestKey": "dod", "latestKeyType": "attribute", "yAxisId": y_axis,
-         "units": units, "decimals": decimals, "lineColor": "rgba(217,105,79,.6)", "lineType": "dashed", "lineWidth": 1,
-         "startSymbol": "none", "endSymbol": "none", "showLabel": True, "labelPosition": "end", "labelColor": CORAL}]
+         "units": units, "decimals": decimals, "lineColor": PAL["RESERVE"], "lineType": "dashed", "lineWidth": 1,
+         "startSymbol": "none", "endSymbol": "none", "showLabel": True, "labelPosition": "end", "labelColor": PAL["CORAL"]}]
 
 
 # The battery reports output as positive; charts show charging going up and discharging going down.
@@ -245,8 +271,8 @@ def energy_chart_config(base, alias_id):
         {"name": key, "type": "timeseries", "label": label, "color": color, "units": "kWh", "decimals": 2,
          "usePostProcessing": True, "postFuncBody": post,
          "settings": {"yAxisId": "default", "showInLegend": True, "dataHiddenByDefault": False, "type": "bar"}}
-        for key, label, color in (("es_total_grid_input_energy", "Grid input", SILVER),
-                                  ("battery_output_total", "Battery output", WARM))]
+        for key, label, color in (("es_total_grid_input_energy", "Grid input", PAL["SILVER"]),
+                                  ("battery_output_total", "Battery output", PAL["WARM"]))]
     cfg.update(title="Energy per day", showLegend=True,
                useDashboardTimewindow=False, timewindow=TW_DAILY_BARS)
     cfg["settings"]["showLegend"] = True
@@ -256,18 +282,18 @@ def energy_chart_config(base, alias_id):
     return style_chart(cfg, {"day": "MMM dd", "month": "MMM dd"})
 
 
-def build(configs, custom, alias_id, grid_alias=None):
-    widgets, layouts = {}, {"default": {}, "settings": {}, "controls": {}}
-    for key in CHART_SPECS:
-        layouts["chart_" + key] = {}
+def build(configs, custom, alias_id, widgets, layouts, grid_alias=None):
+    SILVER, CHARGE, CORAL = PAL["SILVER"], PAL["CHARGE"], PAL["CORAL"]
 
     def add(fqn, wtype, config, w, h, row, col, state="default"):
         if state == "default":
             h, row = int(round(h * ROW_SCALE)), int(round(row * ROW_SCALE))
         wid = str(uuid.uuid4())
+        if not fqn.startswith("system."):
+            config.setdefault("settings", {})["theme"] = THEME
         widgets[wid] = {"id": wid, "typeFullFqn": fqn, "type": wtype,
                         "sizeX": w, "sizeY": h, "row": row, "col": col, "config": config}
-        layouts[state][wid] = {"sizeX": w, "sizeY": h, "row": row, "col": col}
+        layouts.setdefault(state_id(state), {})[wid] = {"sizeX": w, "sizeY": h, "row": row, "col": col}
 
     def custom_cfg():
         return {"datasources": [], "showTitle": False, "backgroundColor": "rgba(0, 0, 0, 0)",
@@ -287,11 +313,11 @@ def build(configs, custom, alias_id, grid_alias=None):
         "latestDataKeys": [{"name": "dod", "type": "attribute", "label": "dod", "color": CORAL, "settings": {}}]}]
     cfg["actions"] = {"cardClick": [{
         "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
-        "type": "openDashboardState", "targetDashboardStateId": "chart_es_bat_soc",
+        "type": "openDashboardState", "targetDashboardStateId": state_id("chart_es_bat_soc"),
         "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
         "openInSeparateDialog": True, "dialogTitle": CHART_SPECS["es_bat_soc"][0],
         "dialogHideDashboardToolbar": True}]}
-    cfg["settings"] = {"image": image_uri("battery_cut")}
+    cfg["settings"] = {"image": image_uri(PAL["IMAGE"])}
 
     top = 2
     if grid_alias:
@@ -301,7 +327,7 @@ def build(configs, custom, alias_id, grid_alias=None):
         top += 1
     add(custom["battery"], "timeseries", cfg, HERO_COLS, top + 10, 0, 0)
 
-    for label, key, units, decimals, icon, color, div, kind, spark, (row, col, w) in CARDS:
+    for label, key, units, decimals, icon, color, div, kind, spark, (row, col, w) in cards():
         cfg = custom_cfg()
         cfg["datasources"] = datasource(alias_id, [(key, label, color)])
         cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
@@ -310,19 +336,19 @@ def build(configs, custom, alias_id, grid_alias=None):
             cfg["settings"].update(gear=True, showAge=True, hint="Controls ›")
             cfg["actions"] = {"gearClick": [{
                 "id": str(uuid.uuid4()), "name": "Battery settings", "icon": "settings",
-                "type": "openDashboardState", "targetDashboardStateId": "settings",
+                "type": "openDashboardState", "targetDashboardStateId": state_id("settings"),
                 "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
                 "openInSeparateDialog": True, "dialogTitle": "Battery settings",
-                "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 38}],
+                "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 58}],
                 "cardClick": [{
                     "id": str(uuid.uuid4()), "name": "Open battery control", "icon": "tune",
-                    "type": "openDashboardState", "targetDashboardStateId": "controls",
+                    "type": "openDashboardState", "targetDashboardStateId": state_id("controls"),
                     "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None}]}
         if key in CHART_SPECS:
             title = CHART_SPECS[key][0]
             cfg["actions"] = {"cardClick": [{
                 "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
-                "type": "openDashboardState", "targetDashboardStateId": "chart_" + key,
+                "type": "openDashboardState", "targetDashboardStateId": state_id("chart_" + key),
                 "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
                 "openInSeparateDialog": True, "dialogTitle": title,
                 "dialogHideDashboardToolbar": True}]}
@@ -349,10 +375,21 @@ def build(configs, custom, alias_id, grid_alias=None):
     return widgets, layouts
 
 
+def base_state(name):
+    return name[:-len("_day")] if name.endswith("_day") else name
+
+
 def dashboard_config(configs, custom, device_name):
     alias_id = str(uuid.uuid4())
     grid_alias = str(uuid.uuid4()) if GRID_DEVICE else None
-    widgets, layouts = build(configs, custom, alias_id, grid_alias)
+    widgets, layouts = {}, {}
+    pages = {}
+    for theme in PALETTES:
+        use_theme(theme)
+        before = set(layouts)
+        build(configs, custom, alias_id, widgets, layouts, grid_alias)
+        pages.update({name: PAL["PAGE"] for name in set(layouts) - before})
+    use_theme("dark")
     aliases = {alias_id: {"id": alias_id, "alias": device_name, "filter": {
         "type": "entityName", "resolveMultiple": False, "entityType": "DEVICE", "entityNameFilter": device_name}}}
     if grid_alias:
@@ -361,10 +398,10 @@ def dashboard_config(configs, custom, device_name):
     return {
         "description": "v" + VERSION,
         "widgets": widgets,
-        "states": {name: {"name": STATE_NAMES.get(name, name), "root": name == "default",
+        "states": {name: {"name": STATE_NAMES.get(base_state(name), base_state(name)), "root": name == "default",
                           "layouts": {"main": {"widgets": layout,
-                                    "gridSettings": dict(GRID, autoFillHeight=name == "default",
-                                                         **({"backgroundColor": "#eeeeee", "margin": 10} if name in LIGHT_STATES else {}))}}}
+                                    "gridSettings": dict(GRID, backgroundColor=pages[name],
+                                                         autoFillHeight=base_state(name) == "default")}}}
                    for name, layout in layouts.items()},
         "entityAliases": aliases,
         "timewindow": TW_MAIN,

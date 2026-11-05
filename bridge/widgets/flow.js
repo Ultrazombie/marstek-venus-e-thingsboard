@@ -1,6 +1,6 @@
 var el, timer, lastTs;
 var STALE_SEC = 180, IDLE_W = 2;
-var GRID = '#C9CDD1', LOAD = '#E8B170';
+var GRID, LOAD;
 
 function last(name) {
     var row = (self.ctx.data || []).filter(function(d) { return d.dataKey && d.dataKey.name === name; })[0];
@@ -55,13 +55,16 @@ function render() {
 
 self.onInit = function() {
     el = self.ctx.$container[0].querySelector('.mf-root');
+    var light = (self.ctx.settings || {}).theme === 'light';
+    GRID = light ? '#55595E' : '#C9CDD1';
+    LOAD = light ? '#A85A12' : '#E8B170';
     function node(cls, name, extra) {
         return '<div class="mf-node ' + cls + '"><div class="mf-dot"></div><div class="mf-name">' + name + (extra || '') + '</div></div>';
     }
     function link(cls) {
         return '<div class="mf-link ' + cls + '"><div class="mf-watts"></div><div class="mf-line"></div><div class="mf-dir"></div></div>';
     }
-    el.innerHTML = '<div class="mf-card"><div class="mf-head"><span class="mf-title">Energy flow</span><span class="mf-status"></span></div>' +
+    el.innerHTML = '<div class="mf-card' + (light ? ' light' : '') + '"><div class="mf-head"><span class="mf-title">Energy flow</span><span class="mf-status"></span></div>' +
         '<div class="mf-diagram">' + node('mf-n-grid', 'Grid') + link('mf-grid') +
         node('mf-n-bat', 'Battery', '<span class="mf-soc">–</span>') + link('mf-load') +
         node('mf-n-load', 'Sockets') + '</div></div>';
