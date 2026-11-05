@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "70"
+VERSION = "71"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -25,7 +25,7 @@ POPUP_WINDOW = {"grid_input_month": TW_MONTH, "battery_output_month": TW_MONTH}
 POPUP_ROWS = 16
 ROW_SCALE = 1
 CARD_ROWS = 1
-SETTINGS_ROWS = 8
+SETTINGS_ROWS = 6
 GRID = {"columns": COLS, "margin": 6, "outerMargin": True, "backgroundSizeMode": "100%"}
 
 PALETTES = {
@@ -338,8 +338,8 @@ def build(configs, custom, alias_id, widgets, layouts, grid_alias=None):
                 "id": str(uuid.uuid4()), "name": "Battery settings", "icon": "settings",
                 "type": "openDashboardState", "targetDashboardStateId": state_id("settings"),
                 "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
-                "openInSeparateDialog": True, "dialogTitle": "Battery settings",
-                "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 58}],
+                "openInSeparateDialog": True, "dialogTitle": "Settings",
+                "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 46}],
                 "cardClick": [{
                     "id": str(uuid.uuid4()), "name": "Open battery control", "icon": "tune",
                     "type": "openDashboardState", "targetDashboardStateId": state_id("controls"),
