@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "49"
+VERSION = "50"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -20,7 +20,7 @@ TW_DAILY_BARS = {"displayValue": "", "selectedTab": 0,
 TW_MONTH = {"selectedTab": 1,
             "history": {"historyType": 0, "interval": 7200000, "timewindowMs": 30 * 24 * 3600 * 1000},
             "aggregation": {"type": "MAX", "limit": 1000}}
-POPUP_WINDOW = {"grid_input_month": TW_MONTH, "grid_output_month": TW_MONTH}
+POPUP_WINDOW = {"grid_input_month": TW_MONTH, "battery_output_month": TW_MONTH}
 POPUP_ROWS = 16
 ROW_SCALE = 1
 CARD_ROWS = 1
@@ -47,9 +47,9 @@ CARDS = [
 # Same fields; rows are relative to the first row below the status cards.
 ENERGY_CARDS = [
     ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None, None, (6, LEFT_COLS, 4)),
-    ("Grid output today", "grid_output_day", "kWh", 2, "today", ORANGE, 1000, None, None, (6, LEFT_COLS + 4, 4)),
+    ("Battery output today", "battery_output_day", "kWh", 2, "today", ORANGE, 1000, None, None, (6, LEFT_COLS + 4, 4)),
     ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None, None, (7, LEFT_COLS, 4)),
-    ("Grid output month", "grid_output_month", "kWh", 2, "calendar_month", ORANGE, 1000, None, None, (7, LEFT_COLS + 4, 4)),
+    ("Battery output month", "battery_output_month", "kWh", 2, "calendar_month", ORANGE, 1000, None, None, (7, LEFT_COLS + 4, 4)),
 ]
 
 TEMP = "#ff7043"
@@ -64,8 +64,8 @@ CHART_SPECS = {
     "bat_bat_capacity": ("Stored energy", "battery_charging_full", "Wh", 0, BLUE, None, []),
     "grid_input_day": ("Grid input today", "today", "kWh", 2, BLUE, 1000, []),
     "grid_input_month": ("Grid input month", "calendar_month", "kWh", 2, BLUE, 1000, []),
-    "grid_output_day": ("Grid output today", "today", "kWh", 2, ORANGE, 1000, []),
-    "grid_output_month": ("Grid output month", "calendar_month", "kWh", 2, ORANGE, 1000, []),
+    "battery_output_day": ("Battery output today", "today", "kWh", 2, ORANGE, 1000, []),
+    "battery_output_month": ("Battery output month", "calendar_month", "kWh", 2, ORANGE, 1000, []),
 }
 Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
 
@@ -217,7 +217,7 @@ def energy_chart_config(base, alias_id):
          "usePostProcessing": True, "postFuncBody": post,
          "settings": {"yAxisId": "default", "showInLegend": True, "dataHiddenByDefault": False, "type": "bar"}}
         for key, label, color in (("es_total_grid_input_energy", "Charged from grid", GREEN),
-                                  ("es_total_grid_output_energy", "Sent to grid", ORANGE))]
+                                  ("es_total_load_energy", "Battery output", ORANGE))]
     cfg.update(title="Energy per day", titleIcon="bar_chart", iconColor=GREEN, showLegend=True,
                useDashboardTimewindow=False, timewindow=TW_DAILY_BARS)
     cfg["settings"]["showLegend"] = True

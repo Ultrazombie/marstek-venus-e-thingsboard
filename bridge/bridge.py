@@ -26,7 +26,7 @@ STATE_FILE = os.environ.get("STATE_FILE", "/data/state.json")
 TZ = ZoneInfo(os.environ.get("TZ", "UTC"))
 # counter key -> telemetry prefix, section of the state file (None keeps the original top-level keys)
 ENERGY_COUNTERS = {"es_total_grid_input_energy": ("grid_input", None),
-                   "es_total_grid_output_energy": ("grid_output", "grid_output")}
+                   "es_total_load_energy": ("battery_output", "battery_output")}
 
 FAST_METHODS = ["ES.GetStatus", "ES.GetMode", "Bat.GetStatus"]
 SLOW_METHODS = ["Wifi.GetStatus"]
