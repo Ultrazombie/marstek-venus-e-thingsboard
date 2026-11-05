@@ -4,7 +4,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "40"
+VERSION = "41"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -27,20 +27,18 @@ GRID = {"backgroundColor": "#eeeeee", "columns": COLS, "margin": 10, "outerMargi
 
 BLUE, GREEN, ORANGE, RED, GREY = "#2196f3", "#4caf50", "#ff9800", "#f44336", "#607d8b"
 
-# label, key, units, decimals, icon, color, divisor, kind
+MAX_POWER = 2500
+CHART_ROWS = 7
+ENERGY_ROW = 2 + CHART_ROWS
+
+# label, key, units, decimals, icon, color, divisor, kind, sparkline range, (row, col, width)
 CARDS = [
-    [
-        ("Battery", "es_bat_soc", "%", 0, "battery_full", GREEN, None, "soc"),
-        ("Mode", "es_mode", "", None, "tune", BLUE, None, "mode"),
-        ("Grid power", "es_ongrid_power", "W", 0, "bolt", GREEN, None, "grid"),
-        ("Off-grid power", "es_offgrid_power", "W", 0, "power", BLUE, None, None),
-    ],
-    [
-        ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp"),
-        ("Stored energy", "bat_bat_capacity", "Wh", 0, "battery_charging_full", BLUE, None, "stored"),
-        ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None),
-        ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None),
-    ],
+    ("Mode", "es_mode", "", None, "tune", BLUE, None, "mode", None, (0, 12, 6)),
+    ("Grid power", "es_ongrid_power", "W", 0, "bolt", GREEN, None, "grid", None, (0, 18, 6)),
+    ("Temperature", "bat_bat_temp", "°C", 1, "thermostat", GREEN, None, "temp", (0, 60), (1, 12, 6)),
+    ("Off-grid power", "es_offgrid_power", "W", 0, "power", BLUE, None, None, None, (1, 18, 6)),
+    ("Grid input today", "grid_input_day", "kWh", 2, "today", BLUE, 1000, None, None, (ENERGY_ROW, 0, 12)),
+    ("Grid input month", "grid_input_month", "kWh", 2, "calendar_month", BLUE, 1000, None, None, (ENERGY_ROW, 12, 12)),
 ]
 
 TEMP = "#ff7043"
@@ -56,14 +54,14 @@ CHART_SPECS = {
     "grid_input_day": ("Grid input today", "today", "kWh", 2, BLUE, 1000, []),
     "grid_input_month": ("Grid input month", "calendar_month", "kWh", 2, BLUE, 1000, []),
 }
-Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60)}
-MAIN_CHARTS = ["es_ongrid_power", "es_offgrid_power", "es_bat_soc"]
+Y_RANGE = {"es_bat_soc": (0, 100), "bat_bat_temp": (0, 60),
+           "es_ongrid_power": (-MAX_POWER, MAX_POWER), "es_offgrid_power": (0, MAX_POWER)}
 
 WIDGETS_DIR = os.path.join(os.path.dirname(__file__), "widgets")
-CUSTOM = {"status_card": "Marstek status card", "controls": "Marstek controls",
+CUSTOM = {"status_card": "Marstek status card", "battery": "Marstek battery card", "controls": "Marstek controls",
           "settings": "Marstek battery settings"}
-CUSTOM_TYPE = {"status_card": "timeseries", "controls": "rpc", "settings": "rpc"}
-CUSTOM_SIZE = {"status_card": (6, 1), "controls": (24, 8), "settings": (24, 5)}
+CUSTOM_TYPE = {"status_card": "timeseries", "battery": "timeseries", "controls": "rpc", "settings": "rpc"}
+CUSTOM_SIZE = {"status_card": (6, 1), "battery": (12, 2), "controls": (24, 8), "settings": (24, 5)}
 
 
 def read(name, ext):
@@ -125,35 +123,41 @@ def axis_limit(value):
     return {"type": "constant", "value": value, "entityAlias": None}
 
 
-def add_reserve_line(cfg, units, decimals):
+def add_reserve_line(cfg, units, decimals, y_axis="default"):
     """Draw the backup reserve (100 - depth of discharge) from the last DOD known to ThingsBoard."""
     cfg["datasources"][0]["latestDataKeys"] = [
         {"name": "dod", "type": "attribute", "label": "Backup reserve", "color": RED, "settings": {},
          "usePostProcessing": True, "postFuncBody": "return 100 - value;"}]
-    cfg["settings"]["thresholds"] = [
-        {"type": "latestKey", "latestKey": "dod", "latestKeyType": "attribute", "yAxisId": "default",
+    cfg["settings"]["thresholds"] = cfg["settings"]["thresholds"] + [
+        {"type": "latestKey", "latestKey": "dod", "latestKeyType": "attribute", "yAxisId": y_axis,
          "units": units, "decimals": decimals, "lineColor": RED, "lineType": "dashed", "lineWidth": 1,
          "startSymbol": "none", "endSymbol": "none", "showLabel": True, "labelPosition": "end", "labelColor": RED}]
 
 
-def chart_config(base, alias_id, key, popup=False):
-    title, icon, units, decimals, color, div, thresholds = CHART_SPECS[key]
+def series_key(key, y_axis="default", fill=True, legend=False):
+    title, _, units, decimals, color, div, _ = CHART_SPECS[key]
+    area = {"type": "gradient", "opacity": 0.15, "gradient": {"start": 55, "end": 0}} if fill else {"type": "none"}
     data_key = {"name": key, "type": "timeseries", "label": title, "color": color,
                 "units": units, "decimals": decimals,
-                "settings": {"yAxisId": "default", "showInLegend": False, "dataHiddenByDefault": False,
+                "settings": {"yAxisId": y_axis, "showInLegend": legend, "dataHiddenByDefault": False,
                              "type": "line",
                              "lineSettings": {"showLine": True, "step": False, "smooth": True, "lineWidth": 2,
                                               "showPoints": False, "showPointLabel": False,
-                                              "fillAreaSettings": {"type": "gradient", "opacity": 0.4,
-                                                                   "gradient": {"start": 55, "end": 0}}}}}
+                                              "fillAreaSettings": area}}}
     if div:
         data_key.update(usePostProcessing=True, postFuncBody="return value / %d;" % div)
+    return data_key
+
+
+def chart_config(base, alias_id, key, popup=False):
+    title, icon, units, decimals, color, div, thresholds = CHART_SPECS[key]
+    data_key = series_key(key)
     cfg = clone(base)
     cfg["datasources"] = [{"type": "entity", "entityAliasId": alias_id, "dataKeys": [data_key]}]
     cfg.update(title=title, showTitle=True, showTitleIcon=True, titleIcon=icon, iconColor=color,
                useDashboardTimewindow=True, units=units, decimals=decimals, dropShadow=False,
                borderRadius="14px", enableFullscreen=False, enableDataExport=False)
-    cfg["settings"].update(showLegend=False, dataZoom=True, stack=False)
+    cfg["settings"].update(showLegend=False, dataZoom=popup, stack=False)
     if popup:
         cfg.update(useDashboardTimewindow=False, timewindow=POPUP_WINDOW.get(key, TW_DAY))
     cfg["settings"]["yAxes"]["default"].update(units=units, decimals=decimals)
@@ -166,6 +170,24 @@ def chart_config(base, alias_id, key, popup=False):
          "showLabel": True, "labelPosition": "end", "labelColor": c} for v, c in thresholds]
     if key == "es_bat_soc":
         add_reserve_line(cfg, units, decimals)
+    return cfg
+
+
+def power_chart_config(base, alias_id):
+    """Grid and off-grid power on the left axis, battery charge and its reserve on the right."""
+    cfg = chart_config(base, alias_id, "es_ongrid_power")
+    cfg["datasources"][0]["dataKeys"] = [
+        series_key("es_ongrid_power", fill=False, legend=True),
+        series_key("es_offgrid_power", fill=False, legend=True),
+        series_key("es_bat_soc", y_axis="soc", legend=True)]
+    cfg.update(title="Power and charge", titleIcon="show_chart", iconColor=BLUE, showLegend=True)
+    cfg["settings"]["showLegend"] = True
+    axes = cfg["settings"]["yAxes"]
+    axes["soc"] = clone(axes["default"])
+    axes["soc"].update(id="soc", order=1, position="right", units="%", decimals=0, label="Charge",
+                       min=axis_limit(0), max=axis_limit(100), interval=25, showSplitLines=False)
+    axes["default"].update(label="+ discharge  /  − charge", interval=MAX_POWER / 2)
+    add_reserve_line(cfg, "%", 0, y_axis="soc")
     return cfg
 
 
@@ -193,44 +215,47 @@ def build(configs, custom, alias_id):
         add("system.time_series_chart", "timeseries", chart_config(base, alias_id, key, popup=True),
             COLS, POPUP_ROWS, 0, 0, state="chart_" + key)
 
-    row = 0
-    for cards in CARDS:
-        w = COLS // len(cards)
-        for i, (label, key, units, decimals, icon, color, div, kind) in enumerate(cards):
-            cfg = custom_cfg()
-            keys = [(key, label, color)]
-            if kind == "stored":
-                keys.append(("bat_rated_capacity", "Rated capacity", color))
-            cfg["datasources"] = datasource(alias_id, keys)
-            cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
-                               "color": color, "divisor": div, "kind": kind}
-            if kind == "mode":
-                cfg["settings"].update(gear=True, showAge=True, hint="Controls ›")
-                cfg["actions"] = {"gearClick": [{
-                    "id": str(uuid.uuid4()), "name": "Battery settings", "icon": "settings",
-                    "type": "openDashboardState", "targetDashboardStateId": "settings",
-                    "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
-                    "openInSeparateDialog": True, "dialogTitle": "Battery settings",
-                    "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 38}],
-                    "cardClick": [{
-                        "id": str(uuid.uuid4()), "name": "Open battery control", "icon": "tune",
-                        "type": "openDashboardState", "targetDashboardStateId": "controls",
-                        "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None}]}
-            if key in CHART_SPECS:
-                title = CHART_SPECS[key][0]
-                cfg["actions"] = {"cardClick": [{
-                    "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
-                    "type": "openDashboardState", "targetDashboardStateId": "chart_" + key,
-                    "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
-                    "openInSeparateDialog": True, "dialogTitle": title,
-                    "dialogHideDashboardToolbar": True}]}
-            add(custom["status_card"], "timeseries", cfg, w, CARD_ROWS, row, i * w)
-        row += CARD_ROWS
+    cfg = custom_cfg()
+    cfg["datasources"] = [{"type": "entity", "entityAliasId": alias_id, "dataKeys": [
+        {"name": n, "type": "timeseries", "label": n, "color": GREEN, "settings": {}}
+        for n in ("es_bat_soc", "bat_bat_capacity", "bat_rated_capacity")],
+        "latestDataKeys": [{"name": "dod", "type": "attribute", "label": "dod", "color": RED, "settings": {}}]}]
+    cfg["actions"] = {"cardClick": [{
+        "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
+        "type": "openDashboardState", "targetDashboardStateId": "chart_es_bat_soc",
+        "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
+        "openInSeparateDialog": True, "dialogTitle": CHART_SPECS["es_bat_soc"][0],
+        "dialogHideDashboardToolbar": True}]}
+    add(custom["battery"], "timeseries", cfg, 12, 2, 0, 0)
 
-    cw = COLS // len(MAIN_CHARTS)
-    for i, key in enumerate(MAIN_CHARTS):
-        add("system.time_series_chart", "timeseries", chart_config(base, alias_id, key), cw, 6, row, i * cw)
-    row += 6
+    for label, key, units, decimals, icon, color, div, kind, spark, (row, col, w) in CARDS:
+        cfg = custom_cfg()
+        cfg["datasources"] = datasource(alias_id, [(key, label, color)])
+        cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
+                           "color": color, "divisor": div, "kind": kind, "spark": spark}
+        if kind == "mode":
+            cfg["settings"].update(gear=True, showAge=True, hint="Controls ›")
+            cfg["actions"] = {"gearClick": [{
+                "id": str(uuid.uuid4()), "name": "Battery settings", "icon": "settings",
+                "type": "openDashboardState", "targetDashboardStateId": "settings",
+                "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
+                "openInSeparateDialog": True, "dialogTitle": "Battery settings",
+                "dialogHideDashboardToolbar": True, "dialogWidth": 70, "dialogHeight": 38}],
+                "cardClick": [{
+                    "id": str(uuid.uuid4()), "name": "Open battery control", "icon": "tune",
+                    "type": "openDashboardState", "targetDashboardStateId": "controls",
+                    "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None}]}
+        if key in CHART_SPECS:
+            title = CHART_SPECS[key][0]
+            cfg["actions"] = {"cardClick": [{
+                "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
+                "type": "openDashboardState", "targetDashboardStateId": "chart_" + key,
+                "openRightLayout": False, "setEntityId": False, "stateEntityParamName": None,
+                "openInSeparateDialog": True, "dialogTitle": title,
+                "dialogHideDashboardToolbar": True}]}
+        add(custom["status_card"], "timeseries", cfg, w, CARD_ROWS, row, col)
+
+    add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id), COLS, CHART_ROWS, 2, 0)
 
     cfg = custom_cfg()
     cfg["targetDevice"] = {"type": "entity", "entityAliasId": alias_id}

@@ -1,0 +1,27 @@
+.mb-root { height: 100%; -webkit-user-select: none; user-select: none; }
+.mb-card {
+  height: 100%; box-sizing: border-box; padding: 12px 18px; border-radius: 12px; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  background: #fff; border: 1px solid rgba(0, 0, 0, .08); box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
+  font-family: Roboto, sans-serif; color: rgba(0, 0, 0, .87);
+}
+.mb-card.clickable { cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.mb-card.clickable:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.mb-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mb-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(0, 0, 0, .62); }
+.mb-updated { font-size: 11px; color: rgba(0, 0, 0, .6); white-space: nowrap; }
+.mb-main { display: flex; align-items: baseline; gap: 4px; line-height: 1; white-space: nowrap; }
+.mb-value { font-size: 42px; font-weight: 600; }
+.mb-unit { font-size: 18px; font-weight: 500; color: rgba(0, 0, 0, .6); }
+.mb-hint { margin-left: 10px; font-size: 13px; font-weight: 500; color: var(--accent); }
+.mb-spark { position: absolute; right: 18px; top: 34px; height: 44px; width: 38%; pointer-events: none; overflow: visible; }
+.mb-track { position: relative; height: 10px; border-radius: 5px; background: rgba(0, 0, 0, .08); }
+.mb-fill { height: 100%; width: 0; border-radius: 5px; background: var(--accent); transition: width .6s ease, background .6s ease; }
+.mb-marker { display: none; position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #f44336; }
+.mb-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: rgba(0, 0, 0, .7); white-space: nowrap; }
+.mb-usable { font-weight: 600; color: rgba(0, 0, 0, .87); }
+.mb-reserve { color: #d32f2f; font-weight: 500; }
+.mb-card.stale { --accent: #90a4ae !important; }
+.mb-card.stale .mb-updated { color: #f44336; }
+.mb-card.stale .mb-value, .mb-card.stale .mb-unit, .mb-card.stale .mb-foot, .mb-card.stale .mb-usable { color: rgba(0, 0, 0, .38); }
+.mb-card.stale .mb-spark { opacity: .35; }

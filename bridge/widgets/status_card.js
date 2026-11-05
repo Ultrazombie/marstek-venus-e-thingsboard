@@ -14,9 +14,6 @@ function state(kind, v) {
         return v > 0 ? { color: RED, hint: 'Exporting to grid' } :
                v < 0 ? { color: GREEN, hint: 'Charging' } : { color: GREY, hint: 'Idle' };
     }
-    if (kind === 'soc') {
-        return { color: v <= 20 ? RED : v <= 40 ? ORANGE : GREEN, hint: v <= 10 ? 'Very low' : v <= 20 ? 'Low' : v >= 99 ? 'Full' : '' };
-    }
     if (kind === 'temp') {
         return v < 5 ? { color: BLUE, hint: 'Cold' } : v < 40 ? { color: GREEN, hint: 'Normal' } :
                v < 50 ? { color: ORANGE, hint: 'Warm' } : { color: RED, hint: 'Hot' };
@@ -50,8 +47,7 @@ self.onInit = function() {
         '<div class="mv-head"><span class="mv-label">' + esc(s.label) + '</span><span class="mv-updated"></span></div>' +
         '<div class="mv-main"><span class="mv-value">–</span><span class="mv-unit">' + esc(s.units) + '</span>' +
         '<span class="mv-hint">' + esc(s.hint) + '</span></div></div>' +
-        '<svg class="mv-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' +
-        (s.kind === 'soc' ? '<div class="mv-bar"><div class="mv-fill"></div></div>' : '') +
+        (s.spark ? '<svg class="mv-spark" viewBox="0 0 100 30" preserveAspectRatio="none"></svg>' : '') +
         (s.gear ? '<button type="button" class="mv-gear" title="Settings"><span class="material-icons">settings</span></button>' : '') +
         '</div>';
     timer = setInterval(age, 15000);
@@ -81,7 +77,7 @@ self.onInit = function() {
     }
 };
 
-function spark(points) {
+function spark(points, range) {
     var svg = el.querySelector('.mv-spark');
     var vals = [];
     var n = Math.min(points.length, 80);
@@ -93,10 +89,9 @@ function spark(points) {
         vals.push(sum / chunk.length);
     }
     if (vals.length < 2) { svg.innerHTML = ''; return; }
-    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
-    var span = hi - lo || 1;
+    var lo = range[0], span = range[1] - range[0];
     var xy = vals.map(function(v, i) {
-        var y = hi === lo ? 15 : 27 - ((v - lo) / span) * 24;
+        var y = 27 - Math.max(0, Math.min(1, (v - lo) / span)) * 24;
         return (i / (vals.length - 1) * 100).toFixed(2) + ',' + y.toFixed(2);
     });
     svg.innerHTML =
@@ -129,22 +124,13 @@ self.onDataUpdated = function() {
         }
     }
     el.querySelector('.mv-value').textContent = shown;
-    if (s.kind === 'stored') {
-        var rated = self.ctx.data[1] && self.ctx.data[1].data;
-        var total = rated && rated.length ? Number(rated[rated.length - 1][1]) : NaN;
-        el.querySelector('.mv-unit').textContent = (total > 0 ? '/ ' + total + ' ' : '') + (s.units || '');
-    }
-    if (s.kind === 'soc' && isNum) {
-        var fill = el.querySelector('.mv-fill');
-        fill.style.width = Math.max(0, Math.min(100, num)) + '%';
-    }
-    if (isNum) {
+    if (isNum && s.spark) {
         var series = [];
         d.forEach(function(p) {
             var x = Number(p[1]);
             if (!isNaN(x)) { series.push(s.divisor ? x / s.divisor : x); }
         });
-        spark(series);
+        spark(series, s.spark);
     }
     lastTs = last[0];
     age();
@@ -155,7 +141,7 @@ self.onDestroy = function() {
 };
 
 self.typeParameters = function() {
-    return { maxDatasources: 1, maxDataKeys: 2, dataKeysOptional: false };
+    return { maxDatasources: 1, maxDataKeys: 1, dataKeysOptional: false };
 };
 
 self.actionSources = function() {

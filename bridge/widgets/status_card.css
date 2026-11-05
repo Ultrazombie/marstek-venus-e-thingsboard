@@ -14,8 +14,8 @@
 .mv-icon .material-icons { font-size: 17px; }
 .mv-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .mv-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-.mv-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(0, 0, 0, .54); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mv-updated { font-size: 10px; color: rgba(0, 0, 0, .45); white-space: nowrap; }
+.mv-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(0, 0, 0, .62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-updated { font-size: 11px; color: rgba(0, 0, 0, .6); white-space: nowrap; }
 .mv-card.stale .mv-updated { color: #f44336; }
 .mv-card.stale { --accent: #90a4ae !important; }
 .mv-card.stale .mv-value, .mv-card.stale .mv-unit { color: rgba(0, 0, 0, .38); }
@@ -23,13 +23,11 @@
 .mv-card.has-gear .mv-body { padding-right: 44px; }
 .mv-main { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; line-height: 1.1; }
 .mv-value { font-size: 20px; font-weight: 600; }
-.mv-unit { font-size: 12px; font-weight: 500; color: rgba(0, 0, 0, .54); }
-.mv-hint { font-size: 11px; font-weight: 500; color: var(--accent); transition: color .4s; }
-.mv-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(0, 0, 0, .06); }
-.mv-fill { height: 100%; width: 0; background: var(--accent); transition: width .6s ease, background .6s ease; }
+.mv-unit { font-size: 12px; font-weight: 500; color: rgba(0, 0, 0, .6); }
+.mv-hint { font-size: 12px; font-weight: 500; color: var(--accent); transition: color .4s; }
 .mv-spark { position: absolute; right: 14px; top: 8px; bottom: 9px; width: 40%; pointer-events: none; overflow: visible; }
 .mv-hint { margin-left: 6px; }
-.mv-gear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: rgba(0, 0, 0, .45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
+.mv-gear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: rgba(0, 0, 0, .45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
 .mv-gear:hover { background: color-mix(in srgb, var(--accent) 14%, #fff); color: var(--accent); }
 .mv-gear .material-icons { font-size: 28px; }
 .mv-root { -webkit-user-select: none; user-select: none; }

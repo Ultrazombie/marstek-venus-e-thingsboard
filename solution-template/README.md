@@ -20,7 +20,7 @@ Needs the local ThingsBoard from `../docker-compose.yml` (default `http://localh
 ## Open items before publishing
 
 - Creator nickname: widget fqn must be `nickname.widget_fqn` (currently `marstek`)
-- Publish the three widgets first: `marstek.status_card`, `marstek.controls`, `marstek.settings`
+- Publish the four widgets first: `marstek.status_card`, `marstek.battery`, `marstek.controls`, `marstek.settings`
 - Public repository and image for the bridge; replace `REPLACE_WITH_PUBLISHED_BRIDGE_IMAGE` in `content/instructions.md`
 - Ask `iothub@thingsboard.io`: is a Solution Template that needs an external bridge allowed, and how to stop the emulator once a real device is connected
 - Gallery screenshots after installing the template on a fresh tenant
