@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "63"
+VERSION = "64"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -149,7 +149,9 @@ def style_chart(cfg, ticks=None):
     font = lambda size: {"family": FONT, "size": size, "sizeUnit": "px", "style": "normal", "weight": "400", "lineHeight": "1.3"}
     cfg.update(backgroundColor="rgba(0,0,0,0)", color=TEXT, dropShadow=False, borderRadius="0px", showTitleIcon=False,
                displayTimewindow=False, titleColor=MUTED, titleFont=font(12),
-               padding="8px 18px", titleStyle={"text-transform": "uppercase", "letter-spacing": ".14em", "font-weight": "400"})
+               padding="8px 18px", titleStyle={"text-transform": "uppercase"},
+               # the platform resets letter spacing on the title style, so it has to come from widget CSS
+               widgetCss=".tb-widget-title .title { letter-spacing: .14em !important; }")
     settings = cfg["settings"]
     settings["background"] = {"type": "color", "color": "rgba(0,0,0,0)",
                               "overlay": {"enabled": False, "color": "rgba(0,0,0,0)", "blur": 3}}

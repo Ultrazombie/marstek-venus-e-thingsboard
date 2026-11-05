@@ -27,14 +27,20 @@ function hint(soc, reserve) {
     return soc <= floor ? (reserve === null ? 'Very low' : 'At reserve') : soc <= floor + 10 ? 'Low' : '';
 }
 
-// Wh per hour over the last hour of stored energy; positive means the battery is draining.
+// Wh per hour lost over the last hour while nothing draws power. Periods with a load are skipped:
+// a short kettle would otherwise look like a permanent drain long after it was switched off.
 function drainRate() {
     var d = series('bat_bat_capacity');
     if (d.length < 2) { return null; }
-    var end = d[d.length - 1], start = null;
-    for (var i = d.length - 1; i >= 0 && end[0] - d[i][0] <= RATE_WINDOW_MS; i--) { start = d[i]; }
-    if (!start || end[0] - start[0] < RATE_MIN_SPAN_MS) { return null; }
-    return (Number(start[1]) - Number(end[1])) / ((end[0] - start[0]) / 3600000);
+    var load = {};
+    series('es_offgrid_power').forEach(function(p) { load[p[0]] = Math.abs(Number(p[1])) || 0; });
+    var end = d[d.length - 1][0], lost = 0, span = 0;
+    for (var i = d.length - 1; i > 0 && end - d[i - 1][0] <= RATE_WINDOW_MS; i--) {
+        if (load[d[i][0]] > FLOW_MIN_W || load[d[i - 1][0]] > FLOW_MIN_W) { continue; }
+        lost += Number(d[i - 1][1]) - Number(d[i][1]);
+        span += d[i][0] - d[i - 1][0];
+    }
+    return span < RATE_MIN_SPAN_MS ? null : lost / (span / 3600000);
 }
 
 // Average output to the sockets over the last minutes: reacts to a new load right away.
