@@ -464,9 +464,13 @@ def handle_rpc(sock, method, params):
             on = bool(params["on"])
             # the device doc defines enable=0 as advertising on and 1 as off
             rpc, body, key, shown = "Ble.Adv", {"enable": 0 if on else 1}, "ble_adv", on
+        if params.get("record"):
+            # the value was set elsewhere, in the Marstek app: the battery cannot report it, so note it here
+            update_state(lambda st: st.setdefault("device", {}).update({key: shown}))
+            return {"set_result": True, "recorded": True}
         result = call(sock, rpc, dict(body, id=0))
         if result is None:
-            raise RuntimeError("no response from device (needs firmware 150 or newer)")
+            raise RuntimeError("no response from device (Marstek documents this command for firmware 150 or newer)")
         if result.get("set_result"):
             update_state(lambda st: st.setdefault("device", {}).update({key: shown}))
         return {"set_result": result.get("set_result")}
