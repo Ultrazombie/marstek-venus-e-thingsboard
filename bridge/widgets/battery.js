@@ -3,7 +3,7 @@ var LEDS = [[38.1, 16.8], [41.5, 16.9], [44.8, 17], [70.4, 17.4], [73.5, 17.5], 
 var MOTES = [[20, 7.5, 0], [31, 9, 2.4], [42, 6.5, 4.6], [58, 8.5, 1.2], [69, 7, 3.4], [80, 9.5, .6], [88, 8, 5.2], [12, 10, 3.9]];
 var STALE_SEC = 180;
 var RATE_WINDOW_MS = 3600000, RATE_MIN_SPAN_MS = 1800000, RATE_MIN_WH = 5;
-var LOAD_WINDOW_MS = 600000, FLOW_MIN_W = 2;
+var LOAD_WINDOW_MS = 600000, FLOW_MIN_W = 2, CHARGE_MIN_SPAN_MS = 120000;
 
 function series(name) {
     var row = (self.ctx.data || []).filter(function(d) { return d.dataKey && d.dataKey.name === name; })[0];
@@ -29,13 +29,16 @@ function hint(soc, reserve) {
 
 // Wh per hour lost over the last hour while nothing draws power. Periods with a load are skipped:
 // a short kettle would otherwise look like a permanent drain long after it was switched off.
+// A charge ends the look back: the battery was in another state before it, and that drain is over.
 function drainRate() {
     var d = series('bat_bat_capacity');
     if (d.length < 2) { return null; }
-    var load = {};
+    var load = {}, grid = {};
     series('es_offgrid_power').forEach(function(p) { load[p[0]] = Math.abs(Number(p[1])) || 0; });
+    series('es_ongrid_power').forEach(function(p) { grid[p[0]] = Number(p[1]) || 0; });
     var end = d[d.length - 1][0], lost = 0, span = 0;
     for (var i = d.length - 1; i > 0 && end - d[i - 1][0] <= RATE_WINDOW_MS; i--) {
+        if (grid[d[i][0]] < -FLOW_MIN_W || grid[d[i - 1][0]] < -FLOW_MIN_W) { break; }
         if (load[d[i][0]] > FLOW_MIN_W || load[d[i - 1][0]] > FLOW_MIN_W) { continue; }
         lost += Number(d[i - 1][1]) - Number(d[i][1]);
         span += d[i][0] - d[i - 1][0];
@@ -52,16 +55,34 @@ function recentLoad() {
     return n ? sum / n : 0;
 }
 
+// Wh per hour gained over the last minutes the mains have been charging the battery.
+function chargeRate() {
+    var d = series('bat_bat_capacity'), grid = {};
+    series('es_ongrid_power').forEach(function(p) { grid[p[0]] = Number(p[1]) || 0; });
+    var end = d.length - 1, i = end;
+    while (i > 0 && d[end][0] - d[i - 1][0] <= LOAD_WINDOW_MS && grid[d[i - 1][0]] < -FLOW_MIN_W) { i--; }
+    var span = end < 0 ? 0 : d[end][0] - d[i][0];
+    return span < CHARGE_MIN_SPAN_MS ? null : (Number(d[end][1]) - Number(d[i][1])) / (span / 3600000);
+}
+
+function spanText(hours) {
+    return hours < 1 ? Math.round(hours * 60) + ' min' : hours < 72 ? Math.round(hours) + ' h' : Math.round(hours / 24) + ' days';
+}
+
 function runtimeText(stored, rated, reserve) {
-    if (stored === null || reserve === null || !rated) { return ''; }
+    if (stored === null || !rated) { return ''; }
+    if ((lastValue('es_ongrid_power') || 0) < -FLOW_MIN_W) {
+        // On mains the sockets are fed from the grid too, so nothing runs down whatever they draw.
+        var gain = chargeRate();
+        if (gain !== null && gain < RATE_MIN_WH) { return ''; }
+        var left = gain === null ? 0 : (rated - stored) / gain;
+        return left * 60 >= 1 ? '≈ ' + spanText(left) + ' to full' : 'Charging';
+    }
+    if (reserve === null) { return ''; }
     var load = recentLoad(), rate = load > FLOW_MIN_W ? load : drainRate();
-    if (rate === null) { return ''; }
-    if (rate <= -RATE_MIN_WH) { return 'Charging'; }
-    if (rate < RATE_MIN_WH) { return ''; }
+    if (rate === null || rate < RATE_MIN_WH) { return ''; }
     var hours = Math.max(0, stored - reserve / 100 * rated) / rate;
-    if (hours <= 0) { return ''; }
-    var span = hours < 1 ? Math.round(hours * 60) + ' min' : hours < 72 ? Math.round(hours) + ' h' : Math.round(hours / 24) + ' days';
-    return '≈ ' + span + ' to reserve';
+    return hours > 0 ? '≈ ' + spanText(hours) + ' to reserve' : '';
 }
 
 function age() {
