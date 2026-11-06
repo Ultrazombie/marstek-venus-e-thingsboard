@@ -9,6 +9,7 @@ Monitor and control a Marstek Venus E home battery from ThingsBoard. A small bri
 - Temperature chart with warning thresholds, plus a built-in alarm for a hot battery.
 - Separate Battery control page, opened from the Mode card, that shows the active mode and what the battery is doing, with one tile per mode: Auto, AI, Manual, Passive and UPS.
 - Charge or discharge at a chosen power for a chosen time, and a weekly Manual schedule of up to 10 windows that you edit in a list and apply to the battery in one step; ThingsBoard remembers the applied windows.
+- A Charge power slider that sets how fast the battery charges whenever grid power is available.
 - Battery settings behind the gear on the Mode card: depth of discharge, LED and Bluetooth advertising.
 - Every command asks for confirmation before anything is sent to the battery.
 

@@ -107,3 +107,9 @@
 .mc-tipwrap:hover .mc-tip { display: block; }
 .mc-root { -webkit-user-select: none; user-select: none; }
 .mc-root input { -webkit-user-select: text; user-select: text; }
+.mc-charge { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(var(--ink), .08); padding-top: 10px; }
+.mc-charge-row { align-items: center; }
+.mc-range { flex: 1 1 200px; max-width: 420px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.mc-charge-val { min-width: 64px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mc-charge-now { font-size: 13px; color: rgba(var(--ink), .54); }
+.mc-charge-now.on { color: var(--ok); }

@@ -274,9 +274,40 @@ def set_all_manual(sock, params):
             update_state(lambda st: st.setdefault("rules", {}).pop(slot, None))
         else:
             update_state(lambda st: st.setdefault("rules", {}).update({slot: rule}))
-    update_state(lambda st: st.update(command={"type": "manual", "at": int(time.time() * 1000)}))
+
+    def done(st):
+        st["command"] = {"type": "manual", "at": int(time.time() * 1000)}
+        if params.get("clearOthers"):
+            st["rules_exact"] = True
+
+    update_state(done)
     latest["mode"] = "Manual"
     return {"set_result": True, "written": applied}
+
+
+def charge_rule(power):
+    return {"slot": 0, "start": "00:00", "end": "23:59", "days": list(range(7)), "power": -power, "enable": True}
+
+
+def charge_power(state):
+    """The battery has no charge power setting, only a power per Manual window.
+
+    So a charge power is one window that charges all day, every day. It counts as set only when
+    that window is the whole schedule: rules_exact says every other slot was cleared from here.
+    """
+    rules = state.get("rules", {})
+    power = -(rules.get("0") or {}).get("power", 0)
+    if latest.get("mode") == "Manual" and state.get("rules_exact") and power > 0 and rules == {"0": charge_rule(power)}:
+        return power
+    return None
+
+
+def set_charge_power(sock, params):
+    power = int(params["power"])
+    if power < 1:
+        raise ValueError("charge power must be at least 1 W")
+    # changing the power rewrites one slot; taking over the schedule clears the other nine as well
+    return set_all_manual(sock, {"windows": [charge_rule(power)], "clearOthers": charge_power(load_state()) is None})
 
 
 DISCHARGE_ERROR = "discharging into the grid is disabled: enable it on the dashboard first"
@@ -286,7 +317,7 @@ EXPORT_MODES = {"Auto", "AI"}
 def get_state():
     state = load_state()
     return {"mode": latest.get("mode"), "power": latest.get("power"), "soc": latest.get("soc"),
-            "allowDischarge": allow_discharge(), "command": state.get("command"),
+            "allowDischarge": allow_discharge(), "command": state.get("command"), "chargePower": charge_power(state),
             "rules": state.get("rules", {}), "device": state.get("device", {})}
 
 
@@ -319,6 +350,8 @@ def handle_rpc(sock, method, params):
         return {"set_result": result.get("set_result")}
     if method == "setManualAll":
         return set_all_manual(sock, params)
+    if method == "setChargePower":
+        return set_charge_power(sock, params)
     if method == "setAllowDischarge":
         value = bool(params["value"])
         update_state(lambda st: st.setdefault("settings", {}).update(allow_discharge=value))
@@ -352,7 +385,8 @@ def handle_rpc(sock, method, params):
             update_state(lambda st: st.setdefault("rules", {}).update({str(value["slot"]): value}))
             update_state(lambda st: st.update(command={"type": "manual", "at": now_ms}))
         else:
-            update_state(lambda st: st.update(command=value))
+            # leaving Manual may drop its windows, and the battery cannot report them
+            update_state(lambda st: st.update(command=value, rules_exact=False))
         latest["mode"] = config["mode"]
     return {"set_result": result.get("set_result")}
 
