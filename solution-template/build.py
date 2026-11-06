@@ -9,10 +9,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "bridge"))
 import dashboard  # noqa: E402
 
-TB_URL = os.environ.get("TB_URL", "http://localhost:8081")
+# The build needs the default configuration of the system chart widget. It is read from a copy of the
+# ThingsBoard source (system_widgets/) unless TB_URL names a running ThingsBoard to fetch it from.
+TB_URL = os.environ.get("TB_URL")
 TB_API_KEY = os.environ.get("TB_API_KEY")
 TB_USER = os.environ.get("TB_USER", "tenant@thingsboard.org")
 TB_PASSWORD = os.environ.get("TB_PASSWORD", "tenant")
+SYSTEM_WIDGETS = os.path.join(HERE, "system_widgets")
 NICKNAME = os.environ.get("NICKNAME", "marstek")
 VERSION = "1.0.0"
 DEVICE = "Marstek Venus E"
@@ -97,17 +100,35 @@ def emulator():
         ("bat_bat_capacity", natural(0, (2600, 2800), (1000, 1200), (4900, 5100), (30, 90))),
         ("grid_input_day", natural(0, (0, 20), (0, 20), (3500, 4500), (10, 60))),
         ("grid_input_month", natural(0, (20000, 25000), (20000, 25000), (90000, 110000), (20, 120))),
+        ("battery_output_day", natural(0, (0, 10), (0, 10), (900, 1200), (5, 30))),
+        ("battery_output_month", natural(0, (6000, 8000), (6000, 8000), (25000, 30000), (10, 60))),
     ]
+    # the widgets read every value through Number(), so a fixed value is an enum with one member
+    fixed = [("bat_rated_capacity", "5120"), ("mains", "1")]
     return [{
         "name": "Venus E Emulator", "publishPeriodInDays": 7, "publishFrequencyInSeconds": 900,
         "publishPauseInMillis": 1, "activityPeriodInMillis": 720000,
         "telemetryProfiles": [{"key": k, "valueStrategy": s} for k, s in profiles] + [
+            {"key": k, "valueStrategy": {"type": "enum", "values": [v]}} for k, v in fixed] + [
             {"key": "es_mode", "valueStrategy": {"type": "enum", "values": ["Passive", "UPS", "Manual"]}}]}]
+
+
+def system_widget_configs(fqns):
+    """The same (type, defaultConfig) pairs default_configs() gets from a server, read from the source copies."""
+    out = {}
+    for fqn in fqns:
+        with open(os.path.join(SYSTEM_WIDGETS, fqn + ".json")) as f:
+            d = json.load(f)["descriptor"]
+        out[fqn] = (d["type"], json.loads(d["defaultConfig"]))
+    return out
 
 
 def build_dashboard(token):
     namespaced = {n: "tenant.%s.%s" % (NICKNAME, n) for n in dashboard.CUSTOM}
-    configs = dashboard.default_configs(http_bound(token), token, ["time_series_chart"])
+    if TB_URL:
+        configs = dashboard.default_configs(http_bound(token), token, ["time_series_chart"])
+    else:
+        configs = system_widget_configs(["time_series_chart"])
     config = dashboard.dashboard_config(configs, namespaced, DEVICE)
     config.pop("description", None)
     return {"title": dashboard.TITLE, "name": dashboard.TITLE, "image": None, "mobileHide": False,
@@ -127,19 +148,17 @@ def widget_exports():
 
 
 def main():
-    token = TB_API_KEY or http("POST", "/api/auth/login", {"username": TB_USER, "password": TB_PASSWORD})["token"]
-    images = os.path.join(PKG, "images")
-    keep = os.listdir(images) if os.path.isdir(images) else []
-    saved = {f: open(os.path.join(images, f), "rb").read() for f in keep}
+    token = None
+    if TB_URL:
+        token = TB_API_KEY or http("POST", "/api/auth/login", {"username": TB_USER, "password": TB_PASSWORD})["token"]
     shutil.rmtree(PKG, ignore_errors=True)
-    os.makedirs(images)
-    for f, data in saved.items():
-        open(os.path.join(images, f), "wb").write(data)
+    shutil.copytree(os.path.join(HERE, "images"), os.path.join(PKG, "images"))
+    gallery = sorted(f for f in os.listdir(os.path.join(HERE, "images")) if f.startswith("gallery-"))
 
     write_json("solution.json", {
         "title": "Marstek Venus E home battery", "installTimeoutMs": 0,
         "previewImageUrl": "images/preview.png",
-        "imageUrls": ["images/" + f for f in ("gallery-1.png", "gallery-2.png") if f in keep]})
+        "imageUrls": ["images/" + f for f in gallery]})
     for name in ("description.md", "instructions.md"):
         shutil.copy(os.path.join(HERE, "content", name), os.path.join(PKG, name))
     write_json("entities/devices.json", [{"name": DEVICE, "type": DEVICE, "emulator": "Venus E Emulator",

@@ -12,26 +12,30 @@ Open the **Marstek Venus E** device in ThingsBoard, press **Copy access token** 
 
 ### Step 3: Run the bridge
 
-The bridge polls the battery over UDP and forwards telemetry to ThingsBoard. It must run on a machine in the same network as the battery. Save the file below as `docker-compose.yml`, fill in the three values and start it.
+The bridge is a small Python program from the [project repository](https://github.com/pon0marev/marstek-venus-e-thingsboard). It polls the battery over UDP and talks to ThingsBoard over MQTT, so it must run on a machine in the same network as the battery: a Raspberry Pi, a home server or any always-on PC. Get the source and start it with Docker, filling in the three values.
 
 ```bash
-cat > docker-compose.yml <<'YAML'
-services:
-  marstek-bridge:
-    image: REPLACE_WITH_PUBLISHED_BRIDGE_IMAGE
-    restart: unless-stopped
-    environment:
-      MARSTEK_HOST: 192.168.1.50
-      TB_URL: https://YOUR_THINGSBOARD_HOST
-      TB_ACCESS_TOKEN: YOUR_DEVICE_ACCESS_TOKEN
-      TZ: Europe/Kyiv
-    volumes:
-      - bridge-data:/data
-volumes:
-  bridge-data:
-YAML
-docker compose up -d
+git clone https://github.com/pon0marev/marstek-venus-e-thingsboard.git
+cd marstek-venus-e-thingsboard
+cat > bridge.env <<'ENV'
+MARSTEK_HOST=192.168.1.50
+TB_URL=https://YOUR_THINGSBOARD_HOST
+TB_ACCESS_TOKEN=YOUR_DEVICE_ACCESS_TOKEN
+TZ=Europe/Kyiv
+ENV
+docker build -t marstek-bridge bridge
+docker run -d --name marstek-bridge --restart unless-stopped --env-file bridge.env -v marstek-bridge-data:/data marstek-bridge
 ```{:copy-code}
+
+Without Docker, the same bridge runs on Python 3.9 or newer:
+
+```bash
+pip install "paho-mqtt>=2,<3" tzdata
+cd bridge
+MARSTEK_HOST=192.168.1.50 TB_URL=https://YOUR_THINGSBOARD_HOST TB_ACCESS_TOKEN=YOUR_DEVICE_ACCESS_TOKEN TZ=Europe/Kyiv STATE_FILE=./state.json python3 bridge.py
+```{:copy-code}
+
+The log shows `mqtt connected` and then one `sent {...}` line per minute. `docker logs marstek-bridge` shows the same when running in Docker.
 
 ### Step 4: Open the dashboard
 
