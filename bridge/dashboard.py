@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "71"
+VERSION = "72"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -15,8 +15,11 @@ def realtime_window(ms):
 
 TW_MAIN = realtime_window(6 * 3600 * 1000)
 TW_DAY = realtime_window(24 * 3600 * 1000)
+# A calendar window: its one-day buckets start at midnight. A "last N days" window slides with the clock,
+# so its buckets would run from noon to noon when the dashboard is opened at noon.
 TW_DAILY_BARS = {"displayValue": "", "selectedTab": 0,
-                 "realtime": {"realtimeType": 0, "interval": 24 * 3600 * 1000, "timewindowMs": 14 * 24 * 3600 * 1000},
+                 "realtime": {"realtimeType": 1, "quickInterval": "CURRENT_MONTH", "interval": 24 * 3600 * 1000,
+                              "timewindowMs": 14 * 24 * 3600 * 1000},
                  "aggregation": {"type": "MAX", "limit": 1000}}
 TW_MONTH = {"selectedTab": 1,
             "history": {"historyType": 0, "interval": 7200000, "timewindowMs": 30 * 24 * 3600 * 1000},
@@ -264,15 +267,14 @@ def power_chart_config(base, alias_id):
 
 
 def energy_chart_config(base, alias_id):
-    """Daily energy from the battery's lifetime counters: each bar is the rise since the previous day."""
+    """Energy per calendar day: the bridge's daily counters restart at midnight, so a day's bar is their maximum."""
     cfg = chart_config(base, alias_id, "grid_input_month")
-    post = "return prevOrigValue ? Math.max(0, value - prevOrigValue) / 1000 : 0;"
     cfg["datasources"][0]["dataKeys"] = [
         {"name": key, "type": "timeseries", "label": label, "color": color, "units": "kWh", "decimals": 2,
-         "usePostProcessing": True, "postFuncBody": post,
+         "usePostProcessing": True, "postFuncBody": "return value / 1000;",
          "settings": {"yAxisId": "default", "showInLegend": True, "dataHiddenByDefault": False, "type": "bar"}}
-        for key, label, color in (("es_total_grid_input_energy", "Grid input", PAL["SILVER"]),
-                                  ("battery_output_total", "Battery output", PAL["WARM"]))]
+        for key, label, color in (("grid_input_day", "Grid input", PAL["SILVER"]),
+                                  ("battery_output_day", "Battery output", PAL["WARM"]))]
     cfg.update(title="Energy per day", showLegend=True,
                useDashboardTimewindow=False, timewindow=TW_DAILY_BARS)
     cfg["settings"]["showLegend"] = True
