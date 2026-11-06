@@ -16,6 +16,13 @@ function lastValue(name) {
     return isNaN(v) ? null : v;
 }
 
+// Time of day, with the date in front when it was not today.
+function clock(ts) {
+    var d = new Date(ts), hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    return d.toDateString() === new Date().toDateString() ? hm :
+        ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + hm;
+}
+
 function reservePercent() {
     var row = (self.ctx.latestData || []).filter(function(d) { return d.dataKey && d.dataKey.name === 'dod'; })[0];
     var dod = row && row.data && row.data[0] ? Number(row.data[0][1]) : NaN;
@@ -30,14 +37,17 @@ function hint(soc, reserve) {
 // Wh per hour lost over the last hour while nothing draws power. Periods with a load are skipped:
 // a short kettle would otherwise look like a permanent drain long after it was switched off.
 // A charge ends the look back: the battery was in another state before it, and that drain is over.
+// So does the start of an outage: on the mains the battery lost nothing, which would thin the rate out.
 function drainRate() {
     var d = series('bat_bat_capacity');
     if (d.length < 2) { return null; }
     var load = {}, grid = {};
     series('es_offgrid_power').forEach(function(p) { load[p[0]] = Math.abs(Number(p[1])) || 0; });
     series('es_ongrid_power').forEach(function(p) { grid[p[0]] = Number(p[1]) || 0; });
+    var outSince = lastValue('mains') === 0 ? lastValue('mains_since') : null;
     var end = d[d.length - 1][0], lost = 0, span = 0;
     for (var i = d.length - 1; i > 0 && end - d[i - 1][0] <= RATE_WINDOW_MS; i--) {
+        if (outSince && d[i - 1][0] < outSince) { break; }
         if (grid[d[i][0]] < -FLOW_MIN_W || grid[d[i - 1][0]] < -FLOW_MIN_W) { break; }
         if (load[d[i][0]] > FLOW_MIN_W || load[d[i - 1][0]] > FLOW_MIN_W) { continue; }
         lost += Number(d[i - 1][1]) - Number(d[i][1]);
@@ -97,7 +107,7 @@ function setMood(card) {
     var grid = lastValue('es_ongrid_power') || 0, off = lastValue('es_offgrid_power') || 0;
     // The battery can lose energy with 0 W reported: its own electronics draw power during an outage.
     var next = grid < -FLOW_MIN_W ? 'charging' : (grid > FLOW_MIN_W || off > FLOW_MIN_W) ? 'discharging' :
-        drainRate() >= RATE_MIN_WH ? 'draining' : 'idle';
+        (lastValue('mains') === 0 || drainRate() >= RATE_MIN_WH) ? 'draining' : 'idle';
     ['charging', 'discharging', 'draining', 'idle'].forEach(function(m) { card.classList.toggle(m, m === next); });
     if (mood && mood !== next) {
         card.classList.remove('bloom');
@@ -144,7 +154,10 @@ function render() {
     var valueNode = el.querySelector('.mb-value');
     roll('soc', shownSoc === null ? 0 : shownSoc, Math.round(soc), function(v) { valueNode.textContent = Math.round(v); });
     shownSoc = Math.round(soc);
-    el.querySelector('.mb-hint').textContent = hint(soc, reserve);
+    // An outage is named in the large line until there is a time estimate to put there instead.
+    var since = lastValue('mains_since'), runtime = runtimeText(stored, rated, reserve);
+    var outage = lastValue('mains') === 0 ? 'Discharging' + (since ? ' since ' + clock(since) : '') : '';
+    el.querySelector('.mb-hint').textContent = [hint(soc, reserve), runtime ? outage : ''].filter(Boolean).join(' · ');
     var level = Math.max(0, Math.min(100, soc)) + '%';
     el.querySelector('.mb-fill').style.width = level;
     el.querySelector('.mb-sheen').style.width = level;
@@ -163,7 +176,9 @@ function render() {
         });
         shownKwh = kwh;
     }
-    el.querySelector('.mb-runtime').textContent = runtimeText(stored, rated, reserve);
+    var runtimeNode = el.querySelector('.mb-runtime');
+    runtimeNode.textContent = runtime || outage;
+    runtimeNode.classList.toggle('alert', !runtime && !!outage);
 
     var d = series('es_bat_soc');
     lastTs = d[d.length - 1][0];
@@ -215,7 +230,7 @@ self.onDestroy = function() {
 };
 
 self.typeParameters = function() {
-    return { maxDatasources: 1, maxDataKeys: 5, dataKeysOptional: false, hasAdditionalLatestDataKeys: true };
+    return { maxDatasources: 1, maxDataKeys: 7, dataKeysOptional: false, hasAdditionalLatestDataKeys: true };
 };
 
 self.actionSources = function() {

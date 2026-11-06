@@ -49,6 +49,7 @@
 .mb-unit { font-size: 28px; font-weight: 300; color: var(--m); }
 .mb-hint { margin-left: 12px; font-size: 14px; font-weight: 400; letter-spacing: .04em; color: var(--c); }
 .mb-runtime { margin-top: 10px; min-height: 40px; font-size: 30px; font-weight: 300; line-height: 40px; white-space: nowrap; transition: color .6s; }
+.mb-runtime.alert { color: var(--c); }
 
 .mb-track { height: 3px; margin-top: 18px; background: var(--line); }
 .mb-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; overflow: visible; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); transition: width 1s cubic-bezier(.22, 1, .36, 1), background .6s ease; }

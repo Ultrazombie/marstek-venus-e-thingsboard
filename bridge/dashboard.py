@@ -5,7 +5,7 @@ import urllib.parse
 import uuid
 
 TITLE = "Marstek Venus E"
-VERSION = "72"
+VERSION = "73"
 COLS = 24
 def realtime_window(ms):
     return {"displayValue": "", "selectedTab": 0,
@@ -311,7 +311,9 @@ def build(configs, custom, alias_id, widgets, layouts, grid_alias=None):
     cfg = custom_cfg()
     cfg["datasources"] = [{"type": "entity", "entityAliasId": alias_id, "dataKeys": [
         {"name": n, "type": "timeseries", "label": n, "color": CHARGE, "settings": {}}
-        for n in ("es_bat_soc", "bat_bat_capacity", "bat_rated_capacity", "es_ongrid_power", "es_offgrid_power")],
+        # mains (1 or 0) and mains_since are worked out by the bridge: the battery does not report them
+        for n in ("es_bat_soc", "bat_bat_capacity", "bat_rated_capacity", "es_ongrid_power", "es_offgrid_power",
+                  "mains", "mains_since")],
         "latestDataKeys": [{"name": "dod", "type": "attribute", "label": "dod", "color": CORAL, "settings": {}}]}]
     cfg["actions"] = {"cardClick": [{
         "id": str(uuid.uuid4()), "name": "Show chart", "icon": "show_chart",
@@ -331,7 +333,8 @@ def build(configs, custom, alias_id, widgets, layouts, grid_alias=None):
 
     for label, key, units, decimals, icon, color, div, kind, spark, (row, col, w) in cards():
         cfg = custom_cfg()
-        cfg["datasources"] = datasource(alias_id, [(key, label, color)])
+        cfg["datasources"] = datasource(alias_id, [(key, label, color)] +
+                                        ([("mains", "mains", color)] if kind == "grid" else []))
         cfg["settings"] = {"label": label, "units": units, "decimals": decimals, "icon": icon,
                            "color": color, "divisor": div, "kind": kind, "spark": spark}
         if kind == "mode":
@@ -358,7 +361,7 @@ def build(configs, custom, alias_id, widgets, layouts, grid_alias=None):
 
     right = COLS - HERO_COLS
     cfg = custom_cfg()
-    cfg["datasources"] = datasource(alias_id, [(n, n, SILVER) for n in ("es_ongrid_power", "es_offgrid_power", "es_bat_soc")])
+    cfg["datasources"] = datasource(alias_id, [(n, n, SILVER) for n in ("es_ongrid_power", "es_offgrid_power", "es_bat_soc", "mains")])
     add(custom["flow"], "timeseries", cfg, right, 2, top, HERO_COLS)
     add("system.time_series_chart", "timeseries", chart_config(base, alias_id, "es_bat_soc"), right, 3, top + 2, HERO_COLS)
     add("system.time_series_chart", "timeseries", power_chart_config(base, alias_id), right, 3, top + 5, HERO_COLS)

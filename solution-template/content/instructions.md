@@ -52,6 +52,7 @@ Open the [main dashboard](${MAIN_DASHBOARD_URL}). Cards refresh every minute and
 - Marstek warns that enabling the Local API may disable some built-in features of the device to avoid command conflicts. Give the battery a static IP address and consider a UDP port between 49152 and 65535 instead of the default 30000.
 - To start with discharging allowed, add `ALLOW_DISCHARGE: "true"` to the bridge environment. The dashboard switch overrides it afterwards.
 - Daily and monthly grid input are computed by the bridge from the battery counter and kept in the `bridge-data` volume.
+- The battery does not report whether grid power is present, and a full battery shows the same 0 W from the grid as a battery in an outage. The bridge works it out from the stored energy: without the grid the battery runs its own electronics and keeps losing energy. An outage with nothing plugged in is noticed within about 10 minutes, the return of grid power as soon as the battery starts charging. During an outage the Grid card reads Off and the battery card says since when it has been discharging.
 - The demo data is simulated. Once the bridge sends real telemetry, the same dashboard shows your battery.
 
 For more about dashboards see the [ThingsBoard documentation](${DOCS_BASE_URL}/docs/user-guide/dashboards/).

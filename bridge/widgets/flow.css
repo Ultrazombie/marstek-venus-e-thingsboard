@@ -30,6 +30,9 @@
 .mf-dir { margin-top: 8px; font-size: 12px; color: var(--m); min-height: 15px; white-space: nowrap; }
 @keyframes mf-forward { to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .mf-link.on .mf-line::after { animation: none; left: 0; width: 100%; opacity: .6; } }
+.mf-link.out .mf-watts { color: var(--c); }
+.mf-link.out .mf-line { background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 10px); opacity: .75; }
+.mf-node.out .mf-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--c); }
 .mf-card.stale .mf-diagram { opacity: .4; }
 .mf-card.stale .mf-status { color: var(--c); }
 .mf-card.light { --t: #17181A; --m: #5E6266; --d: #8f9296; --c: #B23A22; --dot: rgba(0, 0, 0, .3); --line: rgba(0, 0, 0, .16); }

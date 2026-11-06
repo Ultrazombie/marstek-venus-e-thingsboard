@@ -28,6 +28,11 @@ TZ = ZoneInfo(os.environ.get("TZ", "UTC"))
 ENERGY_COUNTERS = {"es_total_grid_input_energy": ("grid_input", None),
                    "battery_output_total": ("battery_output", "battery_output")}
 OUTPUT_MAX_GAP = 300
+# mains detection: grid power that counts as a flow, one step of the stored energy counter,
+# and how long the stored energy has to hold still before the mains are taken to be back
+MAINS_FLOW_W = 2
+MAINS_STEP_WH = 4
+MAINS_FLAT_SEC = 25 * 60
 
 FAST_METHODS = ["ES.GetStatus", "ES.GetMode", "Bat.GetStatus"]
 SLOW_METHODS = ["Wifi.GetStatus"]
@@ -396,6 +401,49 @@ def integrate_output(telemetry, now=None):
     update_state(apply)
 
 
+def detect_mains(telemetry, now=None):
+    """Tell whether the mains are present. The battery does not report it, and a full battery on the mains
+    shows the same 0 W from the grid as a battery in an outage. What differs is the stored energy: without
+    the mains the battery runs its own electronics from it, so it keeps falling, a step every ten minutes."""
+    grid, stored = telemetry.get("es_ongrid_power"), telemetry.get("bat_bat_capacity")
+    now = time.time() if now is None else now
+
+    def number(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    def apply(root):
+        m = root.setdefault("mains", {})
+        on, since = m.get("on"), now
+        if now - m.get("seen", now) > MAINS_FLAT_SEC:
+            # too long without data to know what happened in between: gather the evidence again
+            on = None
+            m.pop("level", None)
+        m["seen"] = now
+        if number(grid) and abs(grid) > MAINS_FLOW_W:
+            on = True
+            if number(stored):
+                m.update(level=stored, level_ts=now)
+        elif number(stored):
+            level = m.get("level")
+            if level is None:
+                m.update(level=stored, level_ts=now)
+            elif stored - level >= MAINS_STEP_WH:
+                on = True  # charged between two polls
+                m.update(level=stored, level_ts=now)
+            elif level - stored >= MAINS_STEP_WH:
+                on = False  # energy left the battery and the grid gave none
+                m.update(level=stored, level_ts=now)
+            elif now - m["level_ts"] >= MAINS_FLAT_SEC:
+                on, since = True, m["level_ts"]  # holding its level, so the grid feeds the electronics
+        if on != m.get("on"):
+            m.update(on=on, since=since)
+        if m.get("on") is not None:
+            telemetry["mains"] = 1 if m["on"] else 0
+            telemetry["mains_since"] = int(m["since"] * 1000)
+
+    update_state(apply)
+
+
 def add_period_energy(telemetry):
     try:
         integrate_output(telemetry)
@@ -443,6 +491,10 @@ def main():
         try:
             telemetry = poll(sock, cycle)
             add_period_energy(telemetry)
+            try:
+                detect_mains(telemetry)
+            except Exception as e:
+                print("mains detection error:", e)
             cycle += 1
             if telemetry:
                 http("POST", "/api/v1/%s/telemetry" % token, telemetry)

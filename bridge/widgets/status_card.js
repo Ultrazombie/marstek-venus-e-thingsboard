@@ -20,6 +20,11 @@ function state(kind, v) {
     return null;
 }
 
+function lastOf(name) {
+    var row = (self.ctx.data || []).filter(function(d) { return d.dataKey && d.dataKey.name === name; })[0];
+    return row && row.data && row.data.length ? row.data[row.data.length - 1][1] : null;
+}
+
 function age() {
     if (!lastTs) { return; }
     var sec = Math.max(0, Math.round((Date.now() - lastTs) / 1000));
@@ -123,6 +128,14 @@ self.onDataUpdated = function() {
         shown = s.decimals != null ? size.toFixed(s.decimals) : String(size);
         num = v;
         var st = state(s.kind, v);
+        // A full battery on the mains shows 0 W too, so an outage is spelled out.
+        var out = s.kind === 'grid' && !v && lastOf('mains') !== null && Number(lastOf('mains')) === 0;
+        if (out) {
+            shown = 'Off';
+            st = { color: CORAL, hint: '' };
+        }
+        card.classList.toggle('out', out);
+        el.querySelector('.mv-unit').textContent = out ? '' : (s.units || '');
         if (st) {
             el.querySelector('.mv-hint').textContent = st.hint;
             card.style.setProperty('--accent', st.color);
@@ -152,7 +165,7 @@ self.onDestroy = function() {
 };
 
 self.typeParameters = function() {
-    return { maxDatasources: 1, maxDataKeys: 1, dataKeysOptional: false };
+    return { maxDatasources: 1, maxDataKeys: 2, dataKeysOptional: false };
 };
 
 self.actionSources = function() {

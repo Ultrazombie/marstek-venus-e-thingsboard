@@ -21,6 +21,7 @@
 @media (prefers-reduced-motion: reduce) { .mv-value.flash { animation: none; } }
 .mv-unit { font-size: 14px; font-weight: 400; color: var(--m); }
 .mv-hint { margin-left: 6px; font-size: 13px; font-weight: 400; color: var(--accent); }
+.mv-card.out .mv-value { color: var(--c); }
 .mv-card.stale { --accent: var(--d) !important; }
 .mv-card.stale .mv-value { color: var(--d); }
 .mv-gear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--m); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color .2s; }

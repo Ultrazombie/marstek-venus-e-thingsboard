@@ -45,6 +45,11 @@ function render() {
     var gridColor = charging ? GRID : LOAD;
     var gridOn = setLink('.mf-grid', grid, !charging, gridColor, charging ? 'Charging' : 'To grid');
     var offOn = setLink('.mf-load', off, false, LOAD, 'To sockets');
+    // A full battery on the mains shows 0 W too, so an outage is drawn as a cut link.
+    var out = last('mains') === 0 && !gridOn, gridLink = el.querySelector('.mf-grid');
+    gridLink.classList.toggle('out', out);
+    el.querySelector('.mf-n-grid').classList.toggle('out', out);
+    if (out) { gridLink.querySelector('.mf-watts').textContent = 'Off'; }
     setNode('.mf-n-grid', gridOn, gridColor);
     setNode('.mf-n-load', offOn, LOAD);
     setNode('.mf-n-bat', gridOn || offOn, gridOn ? gridColor : LOAD);
@@ -79,5 +84,5 @@ self.onDestroy = function() {
 };
 
 self.typeParameters = function() {
-    return { maxDatasources: 1, maxDataKeys: 3, dataKeysOptional: false };
+    return { maxDatasources: 1, maxDataKeys: 4, dataKeysOptional: false };
 };
