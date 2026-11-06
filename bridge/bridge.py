@@ -94,6 +94,13 @@ def call(sock, method, params, retries=3):
     return None
 
 
+def signed16(value):
+    """The battery sends power as an unsigned 16-bit number, so -16 W arrives as 65520."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return value
+    return value - 65536 if 32767 < value <= 65535 else value
+
+
 def poll(sock, cycle):
     telemetry = {}
     methods = FAST_METHODS + (SLOW_METHODS if cycle % SLOW_EVERY == 0 else [])
@@ -104,7 +111,10 @@ def poll(sock, cycle):
             prefix = method.split(".")[0].lower()
             for k, v in result.items():
                 if k not in SKIP_KEYS and isinstance(v, (int, float, str, bool)):
-                    telemetry["%s_%s" % (prefix, k)] = v
+                    telemetry["%s_%s" % (prefix, k)] = signed16(v) if k.endswith("_power") else v
+    if isinstance(telemetry.get("es_offgrid_power"), (int, float)):
+        # the sockets only give power out: a few watts below zero is meter noise when the mains switch over
+        telemetry["es_offgrid_power"] = max(0, telemetry["es_offgrid_power"])
     for key, name in (("es_mode", "mode"), ("es_ongrid_power", "power"), ("es_bat_soc", "soc")):
         if key in telemetry:
             latest[name] = telemetry[key]
