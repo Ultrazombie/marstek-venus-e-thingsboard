@@ -1,5 +1,6 @@
 import json
 import os
+import queue
 import re
 import socket
 import threading
@@ -9,6 +10,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import paho.mqtt.client as mqtt
 
 import dashboard
 
@@ -20,6 +23,10 @@ TB_ACCESS_TOKEN = os.environ.get("TB_ACCESS_TOKEN")
 TB_API_KEY = os.environ.get("TB_API_KEY")
 TB_USER = os.environ.get("TB_USER")
 TB_PASSWORD = os.environ.get("TB_PASSWORD")
+# the device side talks MQTT: the same host as the web interface unless told otherwise, TLS when the web interface has it
+TB_MQTT_HOST = os.environ.get("TB_MQTT_HOST") or urllib.parse.urlsplit(TB_URL).hostname
+TB_MQTT_TLS = TB_URL.startswith("https")
+TB_MQTT_PORT = int(os.environ.get("TB_MQTT_PORT") or (8883 if TB_MQTT_TLS else 1883))
 DEVICE_NAME = os.environ.get("TB_DEVICE_NAME", "Marstek Venus E")
 ALLOW_DISCHARGE = os.environ.get("ALLOW_DISCHARGE", "false").lower() == "true"
 STATE_FILE = os.environ.get("STATE_FILE", "/data/state.json")
@@ -43,7 +50,7 @@ MODE_CFG = {"Auto": "auto_cfg", "AI": "ai_cfg", "UPS": "ups_cfg"}
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 latest = {}
-device_token = None
+device = None
 last_attrs = None
 state_lock = threading.Lock()
 poll_now = threading.Event()
@@ -63,6 +70,109 @@ def http(method, path, body=None, token=None, timeout=15):
     with urllib.request.urlopen(req, timeout=timeout) as r:
         raw = r.read()
         return json.loads(raw) if raw else None
+
+
+class Device:
+    """The device side of ThingsBoard over MQTT.
+
+    Telemetry and attributes go out with QoS 1: paho keeps them while the link is down and sends them
+    once it is back, so every telemetry message carries its own timestamp. RPC requests arrive on a
+    subscription and are answered from a worker thread, because a command can take a quarter of a
+    minute while the network loop has to keep running.
+    """
+
+    def __init__(self, token, on_rpc):
+        self.on_rpc = on_rpc
+        self.connected = threading.Event()
+        self.rpc_queue = queue.Queue()
+        self.attr_reply, self.attr_event = {}, threading.Event()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        self.client.username_pw_set(token)
+        if TB_MQTT_TLS:
+            self.client.tls_set()
+        self.client.on_socket_open = self._on_socket_open
+        self.client.on_connect = self._on_connect
+        self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
+        self.client.reconnect_delay_set(min_delay=1, max_delay=60)
+        self.client.max_queued_messages_set(2000)
+        # one message in flight: a backlog drains at the pace of the acknowledgements instead of
+        # arriving as a burst that trips the per-device rate limit of ThingsBoard Cloud
+        self.client.max_inflight_messages_set(1)
+        threading.Thread(target=self._rpc_worker, daemon=True).start()
+
+    def start(self):
+        self.client.connect_async(TB_MQTT_HOST, TB_MQTT_PORT, keepalive=60)
+        self.client.loop_start()
+
+    def _on_socket_open(self, client, userdata, sock):
+        # paho leaves Nagle's algorithm on, so a small packet sent right after another one (an RPC reply
+        # right after the acknowledgement of the request) waits for the server's ACK: half a second
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+    def _on_connect(self, client, userdata, flags, reason, properties=None):
+        if reason.is_failure:
+            print("mqtt connection refused:", reason)
+            return
+        client.subscribe([("v1/devices/me/rpc/request/+", 1), ("v1/devices/me/attributes/response/+", 1)])
+        self.connected.set()
+        print("mqtt connected to %s:%s" % (TB_MQTT_HOST, TB_MQTT_PORT))
+
+    def _on_disconnect(self, client, userdata, flags, reason, properties=None):
+        self.connected.clear()
+        print("mqtt disconnected (%s), reconnecting" % reason)
+
+    def _on_message(self, client, userdata, msg):
+        try:
+            body = json.loads(msg.payload or b"{}")
+        except ValueError:
+            body = {}
+        if msg.topic.startswith("v1/devices/me/rpc/request/"):
+            self.rpc_queue.put((msg.topic.rsplit("/", 1)[1], body))
+        elif msg.topic.startswith("v1/devices/me/attributes/response/"):
+            self.attr_reply = body
+            self.attr_event.set()
+
+    def _rpc_worker(self):
+        while True:
+            req_id, body = self.rpc_queue.get()
+            print("rpc", body)
+            try:
+                if not isinstance(body, dict):
+                    raise ValueError("request must be a JSON object")
+                resp = self.on_rpc(body.get("method"), body.get("params") or {})
+            except Exception as e:
+                resp = {"error": str(e)}
+            try:
+                self._publish("v1/devices/me/rpc/response/" + req_id, resp)
+            except Exception as e:
+                print("rpc reply error:", e)
+
+    def _publish(self, topic, payload):
+        """Queue a message; False means the queue is full and the message is gone."""
+        info = self.client.publish(topic, json.dumps(payload), qos=1)
+        if info.rc == mqtt.MQTT_ERR_QUEUE_SIZE:
+            print("dropped, the outgoing queue is full:", topic)
+            return False
+        return True
+
+    def telemetry(self, values, ts):
+        return self._publish("v1/devices/me/telemetry", {"ts": ts, "values": values})
+
+    def attributes(self, attrs):
+        # ThingsBoard rejects a null, and a rejected message closes the session: paho would then
+        # resend it after every reconnect and nothing else would ever get through
+        return self._publish("v1/devices/me/attributes", {k: v for k, v in attrs.items() if v is not None})
+
+    def request_attributes(self, keys, timeout=10):
+        """Client attributes saved earlier, or None when ThingsBoard does not answer in time."""
+        if not self.connected.wait(timeout):
+            return None
+        self.attr_event.clear()
+        self.client.publish("v1/devices/me/attributes/request/1", json.dumps({"clientKeys": keys}), qos=1)
+        if not self.attr_event.wait(timeout):
+            return None
+        return self.attr_reply.get("client", {})
 
 
 def provision():
@@ -155,30 +265,25 @@ def state_attributes(state):
 def publish_attributes(state):
     global last_attrs
     attrs = state_attributes(state)
-    if not device_token or attrs == last_attrs:
+    if device is None or attrs == last_attrs:
         return
-    try:
-        http("POST", "/api/v1/%s/attributes" % device_token, attrs)
+    if device.attributes(attrs):
         last_attrs = attrs
-    except Exception as e:
-        print("attributes error:", e)
 
 
 def restore_state():
-    keys = "manual_windows,allow_discharge,dod,led,ble_adv"
-    try:
-        client = (http("GET", "/api/v1/%s/attributes?clientKeys=%s" % (device_token, keys)) or {}).get("client", {})
-    except Exception as e:
-        print("attributes restore error:", e)
+    client = device.request_attributes("manual_windows,allow_discharge,dod,led,ble_adv")
+    if client is None:
+        print("attributes restore: no answer from ThingsBoard, starting from the state file")
         return
 
     def apply(state):
         if "rules" not in state and client.get("manual_windows") is not None:
             state["rules"] = {str(w["slot"]): w for w in client["manual_windows"]}
-        device = state.setdefault("device", {})
+        saved = state.setdefault("device", {})
         for key in ("dod", "led", "ble_adv"):
-            if key not in device and key in client:
-                device[key] = client[key]
+            if key not in saved and key in client:
+                saved[key] = client[key]
         if "allow_discharge" in client:
             state.setdefault("settings", {}).setdefault("allow_discharge", client["allow_discharge"])
 
@@ -391,32 +496,6 @@ def handle_rpc(sock, method, params):
     return {"set_result": result.get("set_result")}
 
 
-def rpc_loop(sock, token):
-    while True:
-        try:
-            req = http("GET", "/api/v1/%s/rpc?timeout=20000" % token, timeout=30)
-        except urllib.error.HTTPError as e:
-            if e.code != 408:
-                print("rpc poll error:", e)
-                time.sleep(5)
-            continue
-        except Exception as e:
-            print("rpc poll error:", e)
-            time.sleep(5)
-            continue
-        if not req or "id" not in req:
-            continue
-        print("rpc", req)
-        try:
-            resp = handle_rpc(sock, req.get("method"), req.get("params") or {})
-        except Exception as e:
-            resp = {"error": str(e)}
-        try:
-            http("POST", "/api/v1/%s/rpc/%s" % (token, req["id"]), resp, timeout=15)
-        except Exception as e:
-            print("rpc reply error:", e)
-
-
 def integrate_output(telemetry, now=None):
     """Battery output in Wh from off-grid power: the battery's own load counter stayed at 0 under load."""
     if "es_offgrid_power" not in telemetry:
@@ -506,18 +585,14 @@ def main():
         except Exception as e:
             print("dashboard creation failed:", e)
 
-    global device_token
-    device_token = token
-    restore_state()
-    update_state(lambda state: None)
-
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("0.0.0.0", PORT))
-    try:
-        http("POST", "/api/v1/%s/attributes" % token, device_attributes(sock))
-    except Exception as e:
-        print("attributes error:", e)
-    threading.Thread(target=rpc_loop, args=(sock, token), daemon=True).start()
+    global device
+    device = Device(token, lambda method, params: handle_rpc(sock, method, params))
+    device.start()
+    restore_state()
+    update_state(lambda state: None)
+    device.attributes(device_attributes(sock))
     print("polling %s:%s every %ss" % (HOST, PORT, INTERVAL))
 
     cycle = 0
@@ -531,8 +606,8 @@ def main():
                 print("mains detection error:", e)
             cycle += 1
             if telemetry:
-                http("POST", "/api/v1/%s/telemetry" % token, telemetry)
-                print("sent", telemetry)
+                device.telemetry(telemetry, int(time.time() * 1000))
+                print("sent" if device.connected.is_set() else "queued, ThingsBoard unreachable", telemetry)
             else:
                 print("no response from device")
         except Exception as e:

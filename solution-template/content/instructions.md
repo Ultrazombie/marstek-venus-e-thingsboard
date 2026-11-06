@@ -50,6 +50,7 @@ Open the [main dashboard](${MAIN_DASHBOARD_URL}). Cards refresh every minute and
 ### Notes
 
 - The battery drops UDP packets when polled too often, so the bridge polls once a minute.
+- The bridge talks to ThingsBoard over MQTT: port 8883 with TLS when `TB_URL` starts with https, port 1883 otherwise, on the host named in `TB_URL`. Set `TB_MQTT_HOST` and `TB_MQTT_PORT` in the bridge environment if your MQTT endpoint differs. Readings taken while ThingsBoard is unreachable are kept in the bridge's memory (up to 2000, lost if the bridge restarts meanwhile) and delivered with their own timestamps once the link is back.
 - Marstek warns that enabling the Local API may disable some built-in features of the device to avoid command conflicts. Give the battery a static IP address and consider a UDP port between 49152 and 65535 instead of the default 30000.
 - To start with discharging allowed, add `ALLOW_DISCHARGE: "true"` to the bridge environment. The dashboard switch overrides it afterwards.
 - Daily and monthly grid input are computed by the bridge from the battery counter and kept in the `bridge-data` volume.
