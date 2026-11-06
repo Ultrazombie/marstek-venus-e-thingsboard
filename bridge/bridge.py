@@ -23,10 +23,11 @@ TB_ACCESS_TOKEN = os.environ.get("TB_ACCESS_TOKEN")
 TB_API_KEY = os.environ.get("TB_API_KEY")
 TB_USER = os.environ.get("TB_USER")
 TB_PASSWORD = os.environ.get("TB_PASSWORD")
-# the device side talks MQTT: the same host as the web interface unless told otherwise, TLS when the web interface has it
+# the device side talks MQTT: the same host as the web interface unless told otherwise,
+# port 8883 with TLS when the web interface has https, 1883 otherwise; TLS follows the port unless set explicitly
 TB_MQTT_HOST = os.environ.get("TB_MQTT_HOST") or urllib.parse.urlsplit(TB_URL).hostname
-TB_MQTT_TLS = TB_URL.startswith("https")
-TB_MQTT_PORT = int(os.environ.get("TB_MQTT_PORT") or (8883 if TB_MQTT_TLS else 1883))
+TB_MQTT_PORT = int(os.environ.get("TB_MQTT_PORT") or (8883 if TB_URL.startswith("https") else 1883))
+TB_MQTT_TLS = os.environ.get("TB_MQTT_TLS", str(TB_MQTT_PORT == 8883)).lower() == "true"
 DEVICE_NAME = os.environ.get("TB_DEVICE_NAME", "Marstek Venus E")
 ALLOW_DISCHARGE = os.environ.get("ALLOW_DISCHARGE", "false").lower() == "true"
 STATE_FILE = os.environ.get("STATE_FILE", "/data/state.json")
@@ -52,6 +53,7 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 latest = {}
 device = None
 last_attrs = None
+restored = False  # the attributes saved in ThingsBoard have been read back, so publishing ours cannot erase them
 state_lock = threading.Lock()
 poll_now = threading.Event()
 sock_lock = threading.Lock()
@@ -86,6 +88,7 @@ class Device:
         self.connected = threading.Event()
         self.rpc_queue = queue.Queue()
         self.attr_reply, self.attr_event = {}, threading.Event()
+        self.last_publish = ("", 0.0)
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.username_pw_set(token)
         if TB_MQTT_TLS:
@@ -121,6 +124,10 @@ class Device:
     def _on_disconnect(self, client, userdata, flags, reason, properties=None):
         self.connected.clear()
         print("mqtt disconnected (%s), reconnecting" % reason)
+        topic, at = self.last_publish
+        if time.time() - at < 3:
+            # ThingsBoard closes the session instead of answering a message it cannot accept
+            print("the disconnect followed a publish to %s: ThingsBoard may have rejected that message" % topic)
 
     def _on_message(self, client, userdata, msg):
         try:
@@ -144,16 +151,23 @@ class Device:
             except Exception as e:
                 resp = {"error": str(e)}
             try:
-                self._publish("v1/devices/me/rpc/response/" + req_id, resp)
+                # not queued for later: a reply that could not go out at once answers a request that has expired
+                self._publish("v1/devices/me/rpc/response/" + req_id, resp, qos=0)
             except Exception as e:
                 print("rpc reply error:", e)
 
-    def _publish(self, topic, payload):
-        """Queue a message; False means the queue is full and the message is gone."""
-        info = self.client.publish(topic, json.dumps(payload), qos=1)
+    def _publish(self, topic, payload, qos=1):
+        """Send or queue a message; False means it is gone: the queue is full or the payload is invalid."""
+        try:
+            body = json.dumps(payload, allow_nan=False)
+        except ValueError as e:
+            print("not sent, invalid value for %s: %s" % (topic, e))
+            return False
+        info = self.client.publish(topic, body, qos=qos)
         if info.rc == mqtt.MQTT_ERR_QUEUE_SIZE:
             print("dropped, the outgoing queue is full:", topic)
             return False
+        self.last_publish = (topic, time.time())
         return True
 
     def telemetry(self, values, ts):
@@ -169,7 +183,7 @@ class Device:
         if not self.connected.wait(timeout):
             return None
         self.attr_event.clear()
-        self.client.publish("v1/devices/me/attributes/request/1", json.dumps({"clientKeys": keys}), qos=1)
+        self._publish("v1/devices/me/attributes/request/1", {"clientKeys": keys}, qos=0)
         if not self.attr_event.wait(timeout):
             return None
         return self.attr_reply.get("client", {})
@@ -265,16 +279,18 @@ def state_attributes(state):
 def publish_attributes(state):
     global last_attrs
     attrs = state_attributes(state)
-    if device is None or attrs == last_attrs:
+    if device is None or not restored or attrs == last_attrs:
         return
     if device.attributes(attrs):
         last_attrs = attrs
 
 
-def restore_state():
-    client = device.request_attributes("manual_windows,allow_discharge,dod,led,ble_adv")
+def restore_state(timeout=10):
+    """Read the saved attributes back once; until that works, nothing is published over them."""
+    global restored
+    client = device.request_attributes("manual_windows,allow_discharge,dod,led,ble_adv", timeout)
     if client is None:
-        print("attributes restore: no answer from ThingsBoard, starting from the state file")
+        print("attributes restore: no answer from ThingsBoard, trying again after the next poll")
         return
 
     def apply(state):
@@ -287,6 +303,7 @@ def restore_state():
         if "allow_discharge" in client:
             state.setdefault("settings", {}).setdefault("allow_discharge", client["allow_discharge"])
 
+    restored = True
     update_state(apply)
 
 
@@ -591,13 +608,17 @@ def main():
     device = Device(token, lambda method, params: handle_rpc(sock, method, params))
     device.start()
     restore_state()
-    update_state(lambda state: None)
-    device.attributes(device_attributes(sock))
+    try:
+        device.attributes(device_attributes(sock))
+    except Exception as e:
+        print("device info error:", e)
     print("polling %s:%s every %ss" % (HOST, PORT, INTERVAL))
 
     cycle = 0
     while True:
         try:
+            if not restored and device.connected.is_set():
+                restore_state()
             telemetry = poll(sock, cycle)
             add_period_energy(telemetry)
             try:
@@ -606,8 +627,8 @@ def main():
                 print("mains detection error:", e)
             cycle += 1
             if telemetry:
-                device.telemetry(telemetry, int(time.time() * 1000))
-                print("sent" if device.connected.is_set() else "queued, ThingsBoard unreachable", telemetry)
+                if device.telemetry(telemetry, int(time.time() * 1000)):
+                    print("sent" if device.connected.is_set() else "queued, ThingsBoard unreachable", telemetry)
             else:
                 print("no response from device")
         except Exception as e:
