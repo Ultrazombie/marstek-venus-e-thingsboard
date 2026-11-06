@@ -424,9 +424,11 @@ def ensure(http, jwt, device_id, device_name):
         cur = http("GET", "/api/dashboard/" + d["id"]["id"], token=jwt)
         if (cur.get("configuration") or {}).get("description") == "v" + VERSION:
             return "exists"
-        http("DELETE", "/api/dashboard/" + d["id"]["id"], token=jwt)
+        # saved under the same id, so links and bookmarks to the dashboard keep working
+        cur["configuration"] = dashboard_config(default_configs(http, jwt, ["time_series_chart"]), custom, device_name)
+        http("POST", "/api/dashboard", cur, token=jwt)
+        return "updated " + d["id"]["id"]
 
-    configs = default_configs(http, jwt, ["time_series_chart"])
-    config = dashboard_config(configs, custom, device_name)
+    config = dashboard_config(default_configs(http, jwt, ["time_series_chart"]), custom, device_name)
     d = http("POST", "/api/dashboard", {"title": TITLE, "configuration": config}, token=jwt)
     return "created " + d["id"]["id"]
