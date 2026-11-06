@@ -1,7 +1,6 @@
 var root, el = {}, st = null, selected = null, picked = false, detailKey = '', busy = false, pollTimer, fitTimer, fitObserver;
 var form = { power: 1000, minutes: 60, dir: -1 };
 var draft = [], dirty = false, clearOthers = true;
-var charge = { value: null, touched: false }, CHARGE_PRESETS = [800, 1500, 2500];
 var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 var MODES = [
     { id: 'Auto', icon: 'autorenew', desc: 'Automatic control based on the smart meter', exports: true },
@@ -102,50 +101,6 @@ function renderStatus() {
     el.status.innerHTML = '<span class="mc-dot ' + (st.power < 0 ? 'charge' : st.power > 0 ? 'discharge' : '') +
         '"></span>' + parts.join(' · ');
     el.sw.checked = allowed();
-}
-
-function chargeHtml() {
-    var presets = CHARGE_PRESETS.filter(function(p) { return p <= maxPower(); }).map(function(p) {
-        return '<button type="button" data-p="' + p + '">' + p + '</button>';
-    }).join('');
-    return '<div class="mc-rules-title">Charge power' +
-        help('How fast the battery charges whenever grid power is available. The battery has no such setting, only a power per Manual window, ' +
-            'so this writes one window that charges all day, every day, and makes it the whole schedule. ' +
-            'Windows created here or in the Marstek app are erased, and changes made in the app afterwards are not seen here.') + '</div>' +
-        '<div class="mc-row mc-charge-row"><input type="range" class="mc-range" min="100" max="' + maxPower() + '" step="50" aria-label="Charge power, W">' +
-        '<span class="mc-charge-val"></span><div class="mc-seg sm">' + presets + '</div>' +
-        '<button type="button" class="mc-btn green" id="mc-charge-set"><span class="material-icons">bolt</span>Set</button>' +
-        '<span class="mc-charge-now"></span></div>';
-}
-
-function renderCharge() {
-    var now = st ? st.chargePower : null;
-    // the slider follows the battery until it is moved, then keeps the pending value
-    if (!charge.touched) { charge.value = now || Math.min(1500, maxPower()); }
-    el.range.value = charge.value;
-    el.chargeVal.textContent = charge.value + ' W';
-    el.chargeSet.disabled = !st || charge.value === now;
-    el.chargeNow.textContent = now ? 'Now ' + now + ' W, all day' : st ? 'Not set from here' : '';
-    el.chargeNow.classList.toggle('on', !!now);
-    el.charge.querySelectorAll('[data-p]').forEach(function(b) { b.classList.toggle('on', Number(b.dataset.p) === charge.value); });
-}
-
-function pickCharge(value) {
-    charge.value = value;
-    charge.touched = true;
-    renderCharge();
-}
-
-function applyCharge() {
-    var p = charge.value, now = st && st.chargePower;
-    confirmThen(now ? 'Change charge power to ' + p + ' W?' : 'Charge at ' + p + ' W whenever grid power is available?',
-        now ? 'The all-day charge window is rewritten with the new power.' :
-        'This switches the battery to Manual mode and replaces its whole schedule with one window: every day, 00:00–23:59, charge at ' + p + ' W. ' +
-        'Windows created here or in the Marstek app are erased. They cannot be read back or restored.',
-        function() {
-            run('setChargePower', { power: p }, 'Charge power ' + p + ' W',
-                { timeout: 150000, onOk: function() { charge.touched = false; dirty = false; } });
-        });
 }
 
 function renderTiles() {
@@ -398,7 +353,6 @@ function fitCell() {
 function render() {
     if (!picked && st) { selected = activeMode() || selected || 'Passive'; }
     renderStatus();
-    renderCharge();
     renderTiles();
     renderDetail(false);
 }
@@ -410,19 +364,11 @@ self.onInit = function() {
         '<div class="mc-panel"><div class="mc-head"><div class="mc-status"></div>' +
         '<label class="mc-switch" title="When off, nothing can send energy from the battery to the grid">' +
         '<input type="checkbox"><span class="mc-slider"></span><span class="mc-switch-text">Allow discharge to grid</span></label></div>' +
-        '<div class="mc-charge">' + chargeHtml() + '</div>' +
         '<div class="mc-tiles"></div><div class="mc-detail"></div>' +
         '<div class="mc-msg"></div></div>';
     el = { status: root.querySelector('.mc-status'), tiles: root.querySelector('.mc-tiles'),
            detail: root.querySelector('.mc-detail'), msg: root.querySelector('.mc-msg'),
-           sw: root.querySelector('.mc-switch input'), charge: root.querySelector('.mc-charge'),
-           range: root.querySelector('.mc-range'), chargeVal: root.querySelector('.mc-charge-val'),
-           chargeSet: root.querySelector('#mc-charge-set'), chargeNow: root.querySelector('.mc-charge-now') };
-    el.range.addEventListener('input', function() { pickCharge(Number(el.range.value)); });
-    el.charge.querySelectorAll('[data-p]').forEach(function(b) {
-        b.addEventListener('click', function() { pickCharge(Number(b.dataset.p)); });
-    });
-    el.chargeSet.addEventListener('click', applyCharge);
+           sw: root.querySelector('.mc-switch input') };
     el.sw.addEventListener('change', function() {
         var want = el.sw.checked;
         el.sw.checked = !want;
